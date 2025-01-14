@@ -1,0 +1,21 @@
+services:
+    rustic:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        volumes:
+            - ./persisted/rustic-cache:/persisted/rustic-cache
+        environment:
+            - SFTP_USER=${SFTP_USER}
+            - SFTP_HOST=${SFTP_HOST}
+            - LOCAL_PATH=/mnt/sftp
+            - REMOTE_BUCKET_NAME=${REMOTE_BUCKET_NAME}
+            - REMOTE_PATH=${REMOTE_PATH}
+            - REMOTE_KEY_ID=${REMOTE_KEY_ID}
+            - REMOTE_ACCESS_KEY=${REMOTE_ACCESS_KEY}
+            - RUSTIC_CACHE=/persisted/rustic-cache
+        command: --help # Default command, can be overridden
+
+volumes:
+    rustic-cache:
+        driver: local

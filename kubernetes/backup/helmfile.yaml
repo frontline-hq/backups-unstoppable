@@ -1,0 +1,91 @@
+environments:
+    default:
+        values:
+            - ./rustic/values/backups.yaml
+    production:
+        values:
+            - ./rustic/values/backups.yaml
+---
+# Repositories for Helm charts
+repositories:
+    - name: openebs
+      url: https://openebs.github.io/openebs
+    # community version of minio
+    - name: minio
+      url: https://charts.min.io/
+
+releases:
+    - name: openebs
+      namespace: openebs
+      chart: openebs/openebs
+      version: ^4.1.2 # Specify the desired version of OpenEBS
+      createNamespace: true
+      wait: true
+      hooks:
+          - events: ["presync"]
+            showlogs: true
+            command: "sh"
+            args:
+                - "-c"
+                - "kubectl create namespace openebs --dry-run=client -o yaml | kubectl apply -f -"
+          - events: ["presync"]
+            showlogs: true
+            command: "kubectl"
+            args:
+                - patch
+                - namespace
+                - openebs
+                - -p
+                - '{"metadata": {"labels":{"pod-security.kubernetes.io/enforce": "privileged"}}}'
+      set:
+          - name: engines.replicated.mayastor.enabled
+            value: false
+      values:
+          - zfs-localpv:
+                enabled: false
+    - name: minio-storage
+      namespace: minio
+      chart: "./minio-storage"
+      version: "0.1.0" # Specify the desired version of OpenEBS
+      createNamespace: true
+      hooks:
+          - events: ["presync"]
+            showlogs: true
+            command: "/bin/bash"
+            args:
+                - "./talos-storage-patch.sh"
+      needs:
+          - openebs/openebs
+    - name: minio
+      namespace: minio
+      chart: minio/minio
+      version: ^5.4.0
+      createNamespace: true
+      wait: true
+      needs:
+          - minio/minio-storage
+      values:
+          - service:
+                type: NodePort
+          - resources:
+                requests:
+                    memory: 512Mi
+          - replicas: 1
+          - persistence:
+                existingClaim: minio-local-pvc
+          - mode: standalone
+          - rootUser: rootuser
+          - rootPassword: rootpass123
+      hooks:
+          - events: ["postsync"]
+            showlogs: true
+            command: "sh"
+            args:
+                - "-c"
+                - "echo 'MinIO is available at http://<node-ip>:32000'"
+          - events: ["postsync"]
+            showlogs: true
+            command: "sh"
+            args:
+                - "-c"
+                - "kubectl port-forward -n minio svc/minio-console 9001:9001 > /dev/null 2>&1 &"

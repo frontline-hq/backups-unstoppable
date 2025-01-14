@@ -1,0 +1,32 @@
+# Ignore Helm-related files and directories
+charts/
+Chart.lock
+.helmignore
+
+# Ignore build artifacts
+*.tgz
+*.tar.gz
+
+# Ignore temporary and system files
+*.swp
+*.bak
+*.tmp
+*.orig
+*.log
+.DS_Store
+Thumbs.db
+
+# Ignore IDE and editor directories and files
+.idea/
+.vscode/
+*.iml
+
+# Ignore dependency directories
+node_modules/
+dist/
+
+# Ignore environment and config files
+.env
+.env.*
+secrets.yaml
+values-secrets.yaml
