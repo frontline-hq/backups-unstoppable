@@ -1,11 +1,3 @@
-environments:
-    default:
-        values:
-            - ./rustic/values/backups.yaml
-    production:
-        values:
-            - ./rustic/values/backups.yaml
----
 # Repositories for Helm charts
 repositories:
     - name: openebs
