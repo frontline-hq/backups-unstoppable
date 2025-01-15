@@ -17,6 +17,19 @@ Short term goal: A script that can be run on a server that backs up a directory 
 -   Load secrets from infisical
 -   rustic implementation
 
+## Get started
+
+1. Install:
+
+    - kubernetes (e.g. with rancher desktop) - needs to be running
+    - talosctl
+    - helm (with helm-diff plugin installed)
+    - helmfile
+
+2. Start kubernetes
+3. talosctl cluster create
+4. helmfile apply
+
 ## Threat scenarios
 
 **Scenario A** ✅
