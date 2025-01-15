@@ -1,3 +1,4 @@
+# helmfile.yaml
 environments:
     default:
         values:
@@ -54,6 +55,11 @@ releases:
             command: "/bin/bash"
             args:
                 - "./talos-storage-patch.sh"
+          - events: ["presync"]
+            showlogs: true
+            command: "/bin/bash"
+            args:
+                - "./minio-storage/scripts/release-pv-claims.sh"
       needs:
           - openebs/openebs
     - name: minio
