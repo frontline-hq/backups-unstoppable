@@ -61,10 +61,11 @@ releases:
                 type: NodePort
           - resources:
                 requests:
-                    memory: 512Mi
+                    memory: 5Gi
           - replicas: 1
           - persistence:
                 existingClaim: minio-local-pvc
+                storageClass: local-openebs-hostpath-minio
           - mode: standalone
           - rootUser: rootuser
           - rootPassword: rootpass123
