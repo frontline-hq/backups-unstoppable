@@ -10,5 +10,5 @@ metadata:
             - name: BasePath
               value: /var/local-openebs-hostpath/minio
 provisioner: openebs.io/local
-reclaimPolicy: Delete
+reclaimPolicy: Retain
 volumeBindingMode: WaitForFirstConsumer
