@@ -28,12 +28,13 @@ Short term goal: A script that can be run on a server that backs up a directory 
     - on commandline: botan, tar
 
 2. Clone repo
-3. Run unlock on secrets: `cd kubernetes && ./locker.sh unlock <your-passphrase>`
-4. Start kubernetes
-5. talosctl cluster create
-6. helmfile apply
+3. `cd kubernetes` and create a .env file with contents `PASSWORD=<your-encryption-password>`. This password is used to lock / unlock secrets used in kubernetes and needs to be 256bits in length as a hex.
+4. Run unlock on secrets: `cd kubernetes && ./locker.sh unlock <your-passphrase>`
+5. Start kubernetes
+6. talosctl cluster create
+7. helmfile apply
 
-Before every commit, run `./locker.sh lock <your-passphrase>`
+Note: there is a git commit hook setup that will lock the repo automatically. Just make sure that the `.env` file is there. Also, you will need to commit the added files again afterwards.
 
 ## Threat scenarios
 
