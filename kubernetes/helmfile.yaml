@@ -1,0 +1,178 @@
+# helmfile.yaml
+environments:
+    default:
+        values:
+        {{- $baseDir := ternary "test" "production" (ne .Environment.Name "production") }}
+        {{- $localDict := dict "previous" "-" }}
+        {{- range $path, $_ := .Files.Glob (printf "vars/%s/**" $baseDir) }}
+        {{- $dirname := base (dir $path) }}
+        {{- if and (ne $dirname "") (ne $dirname $localDict.previous) (ne $dirname $baseDir) }}
+        - {{ $dirname }}:
+            sftp_host_ed25519_pub: ref+file://{{ $baseDir }}/{{ $dirname }}/host_id_ed25519.pub
+            sftp_host_ed25519_priv: ref+file://{{ $baseDir }}/{{ $dirname }}/host_id_ed25519
+            sftp_user_ed25519_pub: ref+file://{{ $baseDir }}/{{ $dirname }}/user_id_ed25519.pub
+            sftp_user_ed25519_priv: ref+file://{{ $baseDir }}/{{ $dirname }}/user_id_ed25519
+        {{- $_ := set $localDict "previous" $dirname }}
+        {{- end }}
+        {{- end }}
+    production:
+        values:
+            - ./rustic/values/backups.yaml
+---
+# Repositories for Helm charts
+repositories:
+    - name: openebs
+      url: https://openebs.github.io/openebs
+    # community version of minio
+    - name: minio
+      url: https://charts.min.io/
+    - name: emberstack
+      url: https://emberstack.github.io/helm-charts
+
+releases:
+    - name: openebs
+      namespace: openebs
+      chart: openebs/openebs
+      version: ^4.1.2 # Specify the desired version of OpenEBS
+      createNamespace: true
+      wait: true
+      hooks:
+          - events: ["presync"]
+            showlogs: true
+            command: "sh"
+            args:
+                - "-c"
+                - "kubectl create namespace openebs --dry-run=client -o yaml | kubectl apply -f -"
+          - events: ["presync"]
+            showlogs: true
+            command: "kubectl"
+            args:
+                - patch
+                - namespace
+                - openebs
+                - -p
+                - '{"metadata": {"labels":{"pod-security.kubernetes.io/enforce": "privileged"}}}'
+      set:
+          - name: engines.replicated.mayastor.enabled
+            value: false
+      values:
+          - zfs-localpv:
+                enabled: false
+    {{- range $key, $value := .Values }}
+    - name: sftp-storage-{{ $key }}
+      namespace: sftp
+      chart: "./sftp-storage"
+      version: "0.1.0"
+      createNamespace: true
+      hooks:
+        - events: ["presync"]
+          showlogs: true
+          command: "/bin/bash"
+          args:
+            - "./talos-storage-patch.sh"
+        - events: ["presync"]
+          showlogs: true
+          command: "/bin/bash"
+          args:
+            - "./sftp-storage/scripts/release-pv-claims.sh"
+            - "local-openebs-hostpath-sftp-{{ $key }}"
+      needs:
+        - openebs/openebs
+      set:
+        - name: name
+          value: {{ $key }}
+
+    - name: sftp-{{ $key }}
+      namespace: sftp
+      chart: emberstack/sftp
+      version: ^5.1.71
+      createNamespace: true
+      needs:
+        - sftp/sftp-storage-{{ $key }}
+      values:
+        - configuration:
+            Global:
+              Chroot:
+                Directory: "%h"
+                StartPath: sftp
+              Directories:
+                - sftp
+              HostKeys:
+                Ed25519: {{ $value.sftp_host_ed25519_priv | quote }}
+            Users:
+              - Username: "user"
+                PublicKeys:
+                  - {{ $value.sftp_user_ed25519_pub | quote }}
+                Chroot:
+                  Directories: "sftp"
+        - storage:
+            volumes:
+              - name: "sftp-storage"
+                persistentVolumeClaim:
+                  claimName: "sftp-{{ $key }}-local-pvc"
+            volumeMounts:
+              - name: "sftp-storage"
+                mountPath: "/home/user/sftp"
+        - type:
+            service: NodePort
+            port: 1234
+      hooks:
+        - events: ["postsync"]
+          showlogs: true
+          command: "sh"
+          args:
+            - "-c"
+            - "kubectl port-forward -n sftp-{{ $key }} svc/sftp-{{ $key }} 1234:1234 > /dev/null 2>&1 &"
+    {{- end }}
+
+    - name: minio-storage
+      namespace: minio
+      chart: "./minio-storage"
+      version: "0.1.0" # Specify the desired version of OpenEBS
+      createNamespace: true
+      hooks:
+          - events: ["presync"]
+            showlogs: true
+            command: "/bin/bash"
+            args:
+                - "./talos-storage-patch.sh"
+          - events: ["presync"]
+            showlogs: true
+            command: "/bin/bash"
+            args:
+                - "./minio-storage/scripts/release-pv-claims.sh"
+      needs:
+          - openebs/openebs
+    - name: minio
+      namespace: minio
+      chart: minio/minio
+      version: ^5.4.0
+      createNamespace: true
+      wait: true
+      needs:
+          - minio/minio-storage
+      values:
+          - service:
+                type: NodePort
+          - resources:
+                requests:
+                    memory: 512Mi
+          - replicas: 1
+          - persistence:
+                existingClaim: minio-local-pvc
+          - mode: standalone
+          - rootUser: rootuser
+          - rootPassword: rootpass123
+      hooks:
+          - events: ["postsync"]
+            showlogs: true
+            command: "sh"
+            args:
+                - "-c"
+                - "echo 'MinIO is available at http://<node-ip>:32000'"
+          - events: ["postsync"]
+            showlogs: true
+            command: "sh"
+            args:
+                - "-c"
+                - "kubectl port-forward -n minio svc/minio-console 9001:9001 > /dev/null 2>&1 &"

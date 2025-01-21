@@ -1,7 +1,7 @@
+# Only run cronjobs in production environment.
+{{- if eq .Values.environment.name "production" }}
 {{- range $cronjob := $.Values.backups }}
-
 ---
-
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -24,6 +24,5 @@ spec:
             - -c
             - {{ $cronjob.command }}
           restartPolicy: OnFailure
-
-
-{{- end }}   
+{{- end }}
+{{- end }}

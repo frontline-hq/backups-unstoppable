@@ -25,10 +25,15 @@ Short term goal: A script that can be run on a server that backs up a directory 
     - talosctl
     - helm (with helm-diff plugin installed)
     - helmfile
+    - on commandline: botan, tar
 
-2. Start kubernetes
-3. talosctl cluster create
-4. helmfile apply
+2. Clone repo
+3. Run unlock on secrets: `cd kubernetes && ./locker.sh unlock <your-passphrase>`
+4. Start kubernetes
+5. talosctl cluster create
+6. helmfile apply
+
+Before every commit, run `./locker.sh lock <your-passphrase>`
 
 ## Threat scenarios
 

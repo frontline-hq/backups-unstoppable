@@ -30,3 +30,6 @@ dist/
 .env.*
 secrets.yaml
 values-secrets.yaml
+
+# Added by benjaminpreiss
+vars/test
