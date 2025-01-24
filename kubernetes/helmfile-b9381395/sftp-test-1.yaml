@@ -1,0 +1,35 @@
+configuration:
+  Global:
+    Chroot:
+      Directory: '%h'
+      StartPath: sftp
+    Directories:
+    - sftp
+    HostKeys:
+      Ed25519: |
+        -----BEGIN OPENSSH PRIVATE KEY-----
+        b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+        QyNTUxOQAAACBzcqI0YVCGz1lDLGpxDJtD4xZv3xE5n/Sl63MrY3GXkAAAAKBQQFEUUEBR
+        FAAAAAtzc2gtZWQyNTUxOQAAACBzcqI0YVCGz1lDLGpxDJtD4xZv3xE5n/Sl63MrY3GXkA
+        AAAEBXagGcvEt7uQZksbjb1TGKPX8Q3uEY+geS9LcoC9omp3NyojRhUIbPWUMsanEMm0Pj
+        Fm/fETmf9KXrcytjcZeQAAAAFmJlbmphbWluQGJlbnByZWlzcy5jb20BAgMEBQYH
+        -----END OPENSSH PRIVATE KEY-----
+  Users:
+  - Chroot:
+      Directories: sftp
+    PublicKeys:
+    - |
+      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIL5PCvK16Vyp8LKEn8OaejzcCE+fMTgcPXrfCwtW1RA1 benjamin@benpreiss.com
+    Username: user
+service:
+  ports:
+  - port: 22
+  type: ClusterIP
+storage:
+  volumeMounts:
+  - mountPath: /home/user/sftp
+    name: sftp-storage
+  volumes:
+  - name: sftp-storage
+    persistentVolumeClaim:
+      claimName: sftp-test-1-local-pvc

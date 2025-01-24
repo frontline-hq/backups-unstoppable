@@ -1,6 +1,6 @@
 apiVersion: v2
-name: minio-storage
-description: A helm chart for minio storage claim and class
+name: sftp-storage
+description: A helm chart for storage claim and class
 
 # A chart can be either an 'application' or a 'library' chart.
 #

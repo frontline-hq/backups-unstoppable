@@ -1,13 +1,8 @@
 [repository]
 repository = "opendal:s3"
 repo-hot = "/backup/rustic"
-password = "$REMOTE_KEY_ID"
+password = "$RUSTIC_ENCRYPTION_PASSWORD"
 cache-dir = "/persisted/rustic-cache"
-
-# options for both parts
-[repository.options]
-access_key_id = "$REMOTE_KEY_ID"
-secret_access_key = "$REMOTE_ACCESS_KEY"
 
 # options only for hot part
 [repository.options-hot]
@@ -17,3 +12,6 @@ secret_access_key = "$REMOTE_ACCESS_KEY"
 bucket = "$REMOTE_BUCKET_NAME"
 root = "$REMOTE_PATH"
 default_storage_class = "DEEP_ARCHIVE"
+endpoint = "$REMOTE_ENDPOINT"
+access_key_id = "$REMOTE_ACCESS_KEY_ID"
+secret_secret_access_key = "$REMOTE_SECRET_ACCESS_KEY"

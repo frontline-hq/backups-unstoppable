@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-    name: sftp-{{ .Values.name }}-local-pvc
+    name: "{{ .Values.service }}-{{ .Values.name }}-local-pvc"
 spec:
     accessModes:
         - ReadWriteOnce
     resources:
         requests:
             storage: 1Gi
-    storageClassName: local-openebs-hostpath-sftp-{{ .Values.name }}
+    storageClassName: "local-openebs-hostpath-{{ .Values.service }}-{{ .Values.name }}"

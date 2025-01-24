@@ -1,5 +1,25 @@
-# Default values for multiple-cronjobs.
-# This is a YAML-formatted file.
-# Declare variables to be passed into your templates.
+# values.yaml
 
-backups: []
+sftp:
+    host: "sftp.example.com"
+    port: "22"
+    user: "sftp_user"
+    mount_path_in_docker: "/mnt/sftp"
+    host_pubkey: ""
+    host_privkey: ""
+    user_pubkey: ""
+    user_privkey: ""
+
+remote:
+    endpoint: "https://s3.amazonaws.com"
+    bucket_name: "my-backup-bucket"
+    path: "/backups"
+    access_key_id: ""
+    secret_access_key: ""
+
+rustic:
+    encryption_password: ""
+
+# Additional configuration options
+backup:
+    schedule: "0 2 * * *" # Run at 2 AM daily

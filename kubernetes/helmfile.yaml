@@ -2,23 +2,44 @@
 environments:
     default:
         values:
-        {{- $baseDir := ternary "test" "production" (ne .Environment.Name "production") }}
-        {{- $localDict := dict "previous" "-" }}
-        {{- range $path, $_ := .Files.Glob (printf "vars/%s/**" $baseDir) }}
-        {{- $dirname := base (dir $path) }}
-        {{- if and (ne $dirname "") (ne $dirname $localDict.previous) (ne $dirname $baseDir) }}
-        - {{ $dirname }}:
-            sftp_host_ed25519_pub: ref+file://{{ $baseDir }}/{{ $dirname }}/host_id_ed25519.pub
-            sftp_host_ed25519_priv: ref+file://{{ $baseDir }}/{{ $dirname }}/host_id_ed25519
-            sftp_user_ed25519_pub: ref+file://{{ $baseDir }}/{{ $dirname }}/user_id_ed25519.pub
-            sftp_user_ed25519_priv: ref+file://{{ $baseDir }}/{{ $dirname }}/user_id_ed25519
-        {{- $_ := set $localDict "previous" $dirname }}
+        {{- range $index, $item := readDirEntries "./vars/test/" }}
+        {{- if $item.IsDir }}
+        - {{ $item.Name }}:
+            sftp:
+                host_pubkey: "ref+file://vars/test/{{ $item.Name }}/host_id_ed25519.pub"
+                host_privkey: "ref+file://vars/test/{{ $item.Name }}/host_id_ed25519"
+                user_pubkey: "ref+file://vars/test/{{ $item.Name }}/user_id_ed25519.pub"
+                user_privkey: "ref+file://vars/test/{{ $item.Name }}/user_id_ed25519"
+                host: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/sftp_host"
+                port: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/sftp_port"
+                user: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/sftp_user"
+                mount_path_in_docker: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/sftp_mount_path_in_docker"
+            remote:
+                endpoint: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote_endpoint"
+                bucket_name: "ref+file://vars/test/{{ $item.Name }}/remote_bucket_name"
+                path: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote_path"
+                access_key_id: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote_access_key_id"
+                secret_access_key: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote_secret_access_key"
+            rustic:
+                encryption_password: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/rustic_encryption_password"
         {{- end }}
         {{- end }}
     production:
         values:
             - ./rustic/values/backups.yaml
 ---
+# Build rustic docker image
+hooks:
+  - events: ["prepare"]
+    showlogs: true
+    command: "docker"
+    args:
+      - "build"
+      - "-t"
+      - "rustic-backup:latest"
+      - "-f"
+      - "./rustic/src/Dockerfile"
+      - "./rustic/src"
 # Repositories for Helm charts
 repositories:
     - name: openebs
@@ -61,7 +82,7 @@ releases:
     {{- range $key, $value := .Values }}
     - name: sftp-storage-{{ $key }}
       namespace: sftp
-      chart: "./sftp-storage"
+      chart: "./storage"
       version: "0.1.0"
       createNamespace: true
       hooks:
@@ -74,13 +95,15 @@ releases:
           showlogs: true
           command: "/bin/bash"
           args:
-            - "./sftp-storage/scripts/release-pv-claims.sh"
+            - "./storage/scripts/release-pv-claims.sh"
             - "local-openebs-hostpath-sftp-{{ $key }}"
       needs:
         - openebs/openebs
       set:
         - name: name
           value: {{ $key }}
+        - name: service
+          value: sftp
 
     - name: sftp-{{ $key }}
       namespace: sftp
@@ -98,11 +121,11 @@ releases:
               Directories:
                 - sftp
               HostKeys:
-                Ed25519: {{ $value.sftp_host_ed25519_priv | quote }}
+                Ed25519: {{ $value.sftp.host_privkey | quote }}
             Users:
               - Username: "user"
                 PublicKeys:
-                  - {{ $value.sftp_user_ed25519_pub | quote }}
+                  - {{ $value.sftp.user_pubkey | quote }}
                 Chroot:
                   Directories: "sftp"
         - storage:
@@ -113,56 +136,69 @@ releases:
             volumeMounts:
               - name: "sftp-storage"
                 mountPath: "/home/user/sftp"
-        - type:
-            service: NodePort
-            port: 1234
-      hooks:
-        - events: ["postsync"]
-          showlogs: true
-          command: "sh"
-          args:
-            - "-c"
-            - "kubectl port-forward -n sftp-{{ $key }} svc/sftp-{{ $key }} 1234:1234 > /dev/null 2>&1 &"
-    {{- end }}
-
-    - name: minio-storage
+        - service:
+            type: ClusterIP
+            ports:
+                - port: 22
+    - name: minio-storage-{{ $key }}
       namespace: minio
-      chart: "./minio-storage"
-      version: "0.1.0" # Specify the desired version of OpenEBS
+      chart: "./storage"
+      version: "0.1.0"
       createNamespace: true
       hooks:
-          - events: ["presync"]
-            showlogs: true
-            command: "/bin/bash"
-            args:
-                - "./talos-storage-patch.sh"
-          - events: ["presync"]
-            showlogs: true
-            command: "/bin/bash"
-            args:
-                - "./minio-storage/scripts/release-pv-claims.sh"
+        - events: ["presync"]
+          showlogs: true
+          command: "/bin/bash"
+          args:
+            - "./talos-storage-patch.sh"
+        - events: ["presync"]
+          showlogs: true
+          command: "/bin/bash"
+          args:
+            - "./storage/scripts/release-pv-claims.sh"
+            - "local-openebs-hostpath-minio-{{ $key }}"
       needs:
-          - openebs/openebs
-    - name: minio
+        - openebs/openebs
+      set:
+        - name: name
+          value: {{ $key }}
+        - name: service
+          value: minio
+    - name: minio-{{ $key }}
       namespace: minio
       chart: minio/minio
       version: ^5.4.0
       createNamespace: true
       wait: true
       needs:
-          - minio/minio-storage
+          - minio/minio-storage-{{ $key }}
       values:
           - service:
-                type: NodePort
+                type: ClusterIP
           - resources:
                 requests:
                     memory: 512Mi
           - replicas: 1
           - persistence:
-                existingClaim: minio-local-pvc
+                existingClaim: minio-{{ $key }}-local-pvc
           - mode: standalone
           - rootUser: rootuser
           - rootPassword: rootpass123
+          - policies:
+              - name: fullAccessTestBucket
+                statements:
+                  - effect: Allow
+                    resources:
+                      - "arn:aws:s3:::test"
+                      - "arn:aws:s3:::test/*"
+                    actions:
+                      - "s3:*"
+          - users:
+              - accessKey: {{ $value.remote.access_key_id }}
+                secretKey: {{ $value.remote.secret_access_key }}
+                policy: fullAccessTestBucket
+          - buckets:
+                - name: "test"
       hooks:
           - events: ["postsync"]
             showlogs: true
@@ -175,4 +211,5 @@ releases:
             command: "sh"
             args:
                 - "-c"
-                - "kubectl port-forward -n minio svc/minio-console 9001:9001 > /dev/null 2>&1 &"
+                - "kubectl port-forward -n minio svc/minio-{{ $key }}-console 9001:9001 > /dev/null 2>&1 &"
+    {{- end }}

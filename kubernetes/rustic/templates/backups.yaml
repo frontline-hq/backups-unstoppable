@@ -1,6 +1,6 @@
 # Only run cronjobs in production environment.
 {{- if eq .Values.environment.name "production" }}
-{{- range $cronjob := $.Values.backups }}
+{{- range $cronjob := $.Values.backup }}
 ---
 apiVersion: batch/v1
 kind: CronJob

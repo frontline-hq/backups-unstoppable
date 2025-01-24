@@ -25,6 +25,7 @@ Short term goal: A script that can be run on a server that backs up a directory 
     - talosctl
     - helm (with helm-diff plugin installed)
     - helmfile
+    - kustomize
     - on commandline: botan, tar
 
 2. Clone repo
@@ -34,7 +35,7 @@ Short term goal: A script that can be run on a server that backs up a directory 
 6. talosctl cluster create
 7. helmfile apply
 
-Note: there is a git commit hook setup that will lock the repo automatically. Just make sure that the `.env` file is there. Also, you will need to commit the added files again afterwards.
+Note: there is a git commit hook setup that will lock the repo automatically. Just make sure that the `.env` file is there.
 
 ## Threat scenarios
 
@@ -104,9 +105,7 @@ customer2/
 -   Use helm to define cronjob (for each customer ressource a dedicated cronjob)
 -   Use helmfile to distinguish between development and production environment. (OpenEBS wants different storage settings in dev than in prod).
 
-## Get Started
+### Test strategy
 
--   Make sure your k8s cluster is running (i.e. `talosctl cluster create`)
--   Run dev or prod in flux ... (what does that mean?)
--   ...
--   At the end destroy k8s cluster by running `talosctl cluster destroy`
+-   We run different deployments on test with different commands that we pass into rustic.
+-   Foremost we want to load up our SFTP server with data, run rustic on it (to our local minio) and then restore the data again. We run the rustic container itself as a test then.
