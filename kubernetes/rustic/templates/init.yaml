@@ -4,15 +4,13 @@ metadata:
   name: "{{ include "rustic.fullname" . }}-init-test"
   labels:
     {{- include "rustic.labels" . | nindent 4 }}
-  annotations:
-    "helm.sh/hook": test
 spec:
   containers:
     - name: rustic-backup
       image: "rustic-backup:latest"
       imagePullPolicy: Never
       command: ["rustic"]
-      args: ["init"]
+      args: ["-v"]
       env:
         - name: SFTP_HOST
           value: {{ .Values.sftp.host | quote }}

@@ -23,3 +23,6 @@ rustic:
 # Additional configuration options
 backup:
     schedule: "0 2 * * *" # Run at 2 AM daily
+
+environment:
+    name: "default"

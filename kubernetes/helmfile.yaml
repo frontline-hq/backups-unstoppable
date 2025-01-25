@@ -10,25 +10,50 @@ environments:
                 host_privkey: "ref+file://vars/test/{{ $item.Name }}/host_id_ed25519"
                 user_pubkey: "ref+file://vars/test/{{ $item.Name }}/user_id_ed25519.pub"
                 user_privkey: "ref+file://vars/test/{{ $item.Name }}/user_id_ed25519"
-                host: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/sftp_host"
-                port: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/sftp_port"
-                user: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/sftp_user"
-                mount_path_in_docker: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/sftp_mount_path_in_docker"
+                host: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/sftp/host"
+                port: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/sftp/port"
+                user: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/sftp/user"
+                mount_path_in_docker: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/sftp/mount_path_in_docker"
             remote:
-                endpoint: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote_endpoint"
-                bucket_name: "ref+file://vars/test/{{ $item.Name }}/remote_bucket_name"
-                path: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote_path"
-                access_key_id: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote_access_key_id"
-                secret_access_key: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote_secret_access_key"
+                endpoint: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote/endpoint"
+                bucket_name: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote/bucket_name"
+                path: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote/path"
+                access_key_id: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote/access_key_id"
+                secret_access_key: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote/secret_access_key"
+                persisted: {{ readFile (printf "./vars/test/%s/secrets.yaml" $item.Name) | fromYaml | get "test.minio.persistance" | default "persisted" }}
             rustic:
-                encryption_password: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/rustic_encryption_password"
+                encryption_password: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/rustic/encryption_password"
         {{- end }}
         {{- end }}
     production:
         values:
-            - ./rustic/values/backups.yaml
+        {{- range $index, $item := readDirEntries "./vars/test/" }}
+        {{- if $item.IsDir }}
+        - {{ $item.Name }}:
+            sftp:
+                host_pubkey: "ref+file://vars/test/{{ $item.Name }}/host_id_ed25519.pub"
+                host_privkey: "ref+file://vars/test/{{ $item.Name }}/host_id_ed25519"
+                user_pubkey: "ref+file://vars/test/{{ $item.Name }}/user_id_ed25519.pub"
+                user_privkey: "ref+file://vars/test/{{ $item.Name }}/user_id_ed25519"
+                host: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/sftp/host"
+                port: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/sftp/port"
+                user: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/sftp/user"
+                mount_path_in_docker: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/sftp/mount_path_in_docker"
+            remote:
+                endpoint: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote/endpoint"
+                bucket_name: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote/bucket_name"
+                path: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote/path"
+                access_key_id: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote/access_key_id"
+                secret_access_key: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote/secret_access_key"
+                persisted: {{ readFile (printf "./vars/test/%s/secrets.yaml" $item.Name) | fromYaml | get "test.minio.persistance" | default "persisted" }}
+            rustic:
+                encryption_password: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/rustic/encryption_password"
+        {{- end }}
+        {{- end }}
 ---
 # Build rustic docker image
+{{ $values := .Values }}
+{{ $env := .Environment.Name | default "default" }}
 hooks:
   - events: ["prepare"]
     showlogs: true
@@ -140,8 +165,10 @@ releases:
             type: ClusterIP
             ports:
                 - port: 22
-    - name: minio-storage-{{ $key }}
-      namespace: minio
+    {{- end }}
+    {{- if ne .Environment.Name "production" }}
+    - name: minio-storage-persisted
+      namespace: minio-persisted
       chart: "./storage"
       version: "0.1.0"
       createNamespace: true
@@ -156,23 +183,28 @@ releases:
           command: "/bin/bash"
           args:
             - "./storage/scripts/release-pv-claims.sh"
-            - "local-openebs-hostpath-minio-{{ $key }}"
+            - "local-openebs-hostpath-minio-persisted"
       needs:
         - openebs/openebs
       set:
         - name: name
-          value: {{ $key }}
+          value: persisted
         - name: service
           value: minio
-    - name: minio-{{ $key }}
-      namespace: minio
+    {{- range $type := list "persisted" "temporary" }}
+    - name: "minio-{{ $type }}"
+      namespace: "minio-{{ $type }}"
       chart: minio/minio
       version: ^5.4.0
       createNamespace: true
       wait: true
+      {{- if eq $type "persisted" }}
       needs:
-          - minio/minio-storage-{{ $key }}
+          - "minio-{{ $type }}/minio-storage-persisted"
+      {{- end }}
       values:
+          - minioAPIPort: 9000
+          - minioConsolePort: 9001
           - service:
                 type: ClusterIP
           - resources:
@@ -180,36 +212,72 @@ releases:
                     memory: 512Mi
           - replicas: 1
           - persistence:
-                existingClaim: minio-{{ $key }}-local-pvc
+                {{- if eq $type "persisted" }}
+                existingClaim: minio-persisted-local-pvc
+                {{- else }}
+                enabled: false
+                {{- end }}
           - mode: standalone
           - rootUser: rootuser
           - rootPassword: rootpass123
           - policies:
-              - name: fullAccessTestBucket
+              {{- range $key, $value := $values }}
+              {{- if eq $type $value.remote.persisted }}
+              - name: "full-access-bucket-{{ $key }}"
                 statements:
                   - effect: Allow
                     resources:
-                      - "arn:aws:s3:::test"
-                      - "arn:aws:s3:::test/*"
+                      - "arn:aws:s3:::{{ $key }}"
+                      - "arn:aws:s3:::{{ $key }}/*"
                     actions:
                       - "s3:*"
+              {{- end }}
+              {{- end }}
           - users:
+              {{- range $key, $value := $values }}
+              {{- if eq $type $value.remote.persisted }}
               - accessKey: {{ $value.remote.access_key_id }}
                 secretKey: {{ $value.remote.secret_access_key }}
-                policy: fullAccessTestBucket
+                policy: full-access-bucket-{{ $key }}
+              {{- end }}
+              {{- end }}
           - buckets:
-                - name: "test"
-      hooks:
-          - events: ["postsync"]
-            showlogs: true
-            command: "sh"
-            args:
-                - "-c"
-                - "echo 'MinIO is available at http://<node-ip>:32000'"
-          - events: ["postsync"]
-            showlogs: true
-            command: "sh"
-            args:
-                - "-c"
-                - "kubectl port-forward -n minio svc/minio-{{ $key }}-console 9001:9001 > /dev/null 2>&1 &"
+                {{- range $key, $value := $values }}
+                {{- if eq $type $value.remote.persisted }}
+                - name: {{ $key }}
+                {{- end }}
+                {{- end }}
+    {{- end }}
+    {{- end }}
+    {{- range $key, $value := $values }}
+    - name: "rustic-{{ $key }}"
+      namespace: "rustic"
+      chart: "./rustic"
+      version: ^0.1.0
+      createNamespace: true
+      {{- if ne $env "production" }}
+      needs:
+          - "minio-{{ $value.remote.persisted }}/minio-{{ $value.remote.persisted }}"
+      {{- end }}
+      values:
+        - sftp:
+            host_pubkey: {{ $value.sftp.host_pubkey }}
+            host_privkey: {{ $value.sftp.host_privkey }}
+            user_pubkey: {{ $value.sftp.user_pubkey }}
+            user_privkey: {{ $value.sftp.user_privkey }}
+            host: {{ $value.sftp.host }}
+            port: {{ $value.sftp.port }}
+            user: {{ $value.sftp.user }}
+            mount_path_in_docker: {{ $value.sftp.mount_path_in_docker }}
+        - remote:
+            endpoint: {{ $value.remote.endpoint }}
+            bucket_name: {{ $value.remote.bucket_name }}
+            path: {{ $value.remote.path }}
+            access_key_id: {{ $value.remote.access_key_id }}
+            secret_access_key: {{ $value.remote.secret_access_key }}
+            persisted: {{ $value.remote.persisted }}
+        - rustic:
+            encryption_password: {{ $value.rustic.encryption_password }}
+        - environment:
+            name: {{ $env }}
     {{- end }}
