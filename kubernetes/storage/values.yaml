@@ -1,2 +1,3 @@
 name: default
 service: service
+size: 1Gi

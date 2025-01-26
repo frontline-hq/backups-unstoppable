@@ -9,8 +9,8 @@ metadata:
 spec:
   containers:
     - name: rustic-backup
-      image: "rustic-backup:latest"
-      imagePullPolicy: Never
+      image: "http://localhost:30001/rustic-backup:latest"
+      imagePullPolicy: IfNotPresent
       command: ["rustic"]
       args: ["init"]
       env:

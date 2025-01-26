@@ -14,6 +14,7 @@ environments:
                 port: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/sftp/port"
                 user: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/sftp/user"
                 mount_path_in_docker: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/sftp/mount_path_in_docker"
+                persisted: {{ readFile (printf "./vars/test/%s/secrets.yaml" $item.Name) | fromYaml | get "test.sftp.persistance" | default "persisted" }}
             remote:
                 endpoint: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote/endpoint"
                 bucket_name: "ref+file://vars/test/{{ $item.Name }}/secrets.yaml#/remote/bucket_name"
@@ -54,17 +55,6 @@ environments:
 # Build rustic docker image
 {{ $values := .Values }}
 {{ $env := .Environment.Name | default "default" }}
-hooks:
-  - events: ["prepare"]
-    showlogs: true
-    command: "docker"
-    args:
-      - "build"
-      - "-t"
-      - "rustic-backup:latest"
-      - "-f"
-      - "./rustic/src/Dockerfile"
-      - "./rustic/src"
 # Repositories for Helm charts
 repositories:
     - name: openebs
@@ -74,6 +64,8 @@ repositories:
       url: https://charts.min.io/
     - name: emberstack
       url: https://emberstack.github.io/helm-charts
+    - name: harbor
+      url: https://helm.goharbor.io
 
 releases:
     - name: openebs
@@ -105,11 +97,13 @@ releases:
           - zfs-localpv:
                 enabled: false
     {{- range $key, $value := .Values }}
+    {{- if eq $value.remote.persisted "persisted" }}
     - name: sftp-storage-{{ $key }}
       namespace: sftp
       chart: "./storage"
       version: "0.1.0"
       createNamespace: true
+      wait: true
       hooks:
         - events: ["presync"]
           showlogs: true
@@ -129,14 +123,16 @@ releases:
           value: {{ $key }}
         - name: service
           value: sftp
-
+    {{- end }}
     - name: sftp-{{ $key }}
       namespace: sftp
       chart: emberstack/sftp
       version: ^5.1.71
       createNamespace: true
+      {{- if eq $value.remote.persisted "persisted" }}
       needs:
         - sftp/sftp-storage-{{ $key }}
+      {{- end }}
       values:
         - configuration:
             Global:
@@ -153,6 +149,7 @@ releases:
                   - {{ $value.sftp.user_pubkey | quote }}
                 Chroot:
                   Directories: "sftp"
+        {{- if eq $value.remote.persisted "persisted" }}
         - storage:
             volumes:
               - name: "sftp-storage"
@@ -161,6 +158,7 @@ releases:
             volumeMounts:
               - name: "sftp-storage"
                 mountPath: "/home/user/sftp"
+        {{- end }}
         - service:
             type: ClusterIP
             ports:
@@ -172,6 +170,7 @@ releases:
       chart: "./storage"
       version: "0.1.0"
       createNamespace: true
+      wait: true
       hooks:
         - events: ["presync"]
           showlogs: true
@@ -197,7 +196,6 @@ releases:
       chart: minio/minio
       version: ^5.4.0
       createNamespace: true
-      wait: true
       {{- if eq $type "persisted" }}
       needs:
           - "minio-{{ $type }}/minio-storage-persisted"
@@ -249,6 +247,81 @@ releases:
                 {{- end }}
     {{- end }}
     {{- end }}
+    {{- $harborComponents := list "registry" "chartmuseum" "jobservice" "database" "redis" }}
+    {{- $harborSizes := dict "registry" "5Gi" "chartmuseum" "5Gi" "jobservice" "1Gi" "database" "1Gi" "redis" "1Gi" }}
+    {{- range $component := $harborComponents }}
+    - name: harbor-storage-{{ $component }}
+      namespace: harbor
+      chart: "./storage"
+      version: "0.1.0"
+      createNamespace: true
+      wait: true
+      hooks:
+        - events: ["presync"]
+          showlogs: true
+          command: "/bin/bash"
+          args:
+            - "./talos-storage-patch.sh"
+        - events: ["presync"]
+          showlogs: true
+          command: "/bin/bash"
+          args:
+            - "./storage/scripts/release-pv-claims.sh"
+            - "local-openebs-hostpath-harbor-{{ $component }}"
+      needs:
+        - openebs/openebs
+      set:
+        - name: name
+          value: "{{ $component }}"
+        - name: service
+          value: harbor
+        - name: size
+          value: {{ index $harborSizes $component }}
+    {{- end }}
+    - name: harbor
+      namespace: harbor
+      chart: harbor/harbor
+      version: 1.16.2
+      needs:
+      {{- range $component := $harborComponents }}
+        - harbor/harbor-storage-{{ $component }}
+      {{- end }}
+      values:
+        - expose:
+            type: nodePort
+            tls:
+              enabled: false
+            nodePort:
+              ports:
+                http:
+                  nodePort: 30001
+        - externalURL: http://localhost:30001
+        - harborAdminPassword: "admin"
+        - database:
+            type: internal
+        - redis:
+            type: internal
+        - persistence:
+            enabled: true
+            persistentVolumeClaim:
+              {{- range $component := $harborComponents }}
+              {{ $component }}:
+                {{- if ne $component "jobservice" }}
+                existingClaim: "harbor-{{ $component }}-local-pvc"
+                {{- else }}
+                jobLog:
+                  existingClaim: "harbor-{{ $component }}-local-pvc"
+                {{- end }}
+              {{- end }}
+        - trivy:
+            enabled: false
+    - name: "rustic-image"
+      namespace: "rustic"
+      chart: "./rustic-image"
+      version: ^0.1.0
+      createNamespace: true
+      needs: 
+        - "harbor/harbor"
     {{- range $key, $value := $values }}
     - name: "rustic-{{ $key }}"
       namespace: "rustic"
@@ -258,6 +331,8 @@ releases:
       {{- if ne $env "production" }}
       needs:
           - "minio-{{ $value.remote.persisted }}/minio-{{ $value.remote.persisted }}"
+          - "sftp/sftp-{{ $key }}"
+          - "rustic/rustic-image"
       {{- end }}
       values:
         - sftp:

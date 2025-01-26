@@ -1,0 +1,4 @@
+image:
+    name: "rustic-backup"
+    tag: "latest"
+    registry: "localhost:30001"
