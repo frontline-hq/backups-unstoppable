@@ -8,7 +8,7 @@ metadata:
     "helm.sh/hook": test
 spec:
   containers:
-    - name: rustic-backup
+    - name: rustic
       image: "http://localhost:30001/rustic-backup:latest"
       imagePullPolicy: IfNotPresent
       command: ["rustic"]

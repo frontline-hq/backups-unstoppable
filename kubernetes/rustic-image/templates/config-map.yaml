@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rustic-docker-context
+data:
+  {{- $files := .Files }}
+  {{- range tuple "Dockerfile" "entrypoint.sh" "rustic.template.toml" }}
+  {{ . }}: |-
+{{ $files.Get . | indent 4 }}
+  {{- end }}

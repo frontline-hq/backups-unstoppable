@@ -1,4 +1,17 @@
 image:
-    name: "rustic-backup"
+    name: "rustic"
     tag: "latest"
-    registry: "localhost:30001"
+registry:
+    domain: "docker.io"
+    namespace: "namespace"
+    username: ""
+    password: ""
+kaniko:
+    secret_content: |
+        {
+            "auths": {
+                "https://index.docker.io/v1/": {
+                "auth": "xxxxxxxxxxxxxxx"
+                }
+            }
+        }

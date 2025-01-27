@@ -247,81 +247,18 @@ releases:
                 {{- end }}
     {{- end }}
     {{- end }}
-    {{- $harborComponents := list "registry" "chartmuseum" "jobservice" "database" "redis" }}
-    {{- $harborSizes := dict "registry" "5Gi" "chartmuseum" "5Gi" "jobservice" "1Gi" "database" "1Gi" "redis" "1Gi" }}
-    {{- range $component := $harborComponents }}
-    - name: harbor-storage-{{ $component }}
-      namespace: harbor
-      chart: "./storage"
-      version: "0.1.0"
-      createNamespace: true
-      wait: true
-      hooks:
-        - events: ["presync"]
-          showlogs: true
-          command: "/bin/bash"
-          args:
-            - "./talos-storage-patch.sh"
-        - events: ["presync"]
-          showlogs: true
-          command: "/bin/bash"
-          args:
-            - "./storage/scripts/release-pv-claims.sh"
-            - "local-openebs-hostpath-harbor-{{ $component }}"
-      needs:
-        - openebs/openebs
-      set:
-        - name: name
-          value: "{{ $component }}"
-        - name: service
-          value: harbor
-        - name: size
-          value: {{ index $harborSizes $component }}
-    {{- end }}
-    - name: harbor
-      namespace: harbor
-      chart: harbor/harbor
-      version: 1.16.2
-      needs:
-      {{- range $component := $harborComponents }}
-        - harbor/harbor-storage-{{ $component }}
-      {{- end }}
-      values:
-        - expose:
-            type: nodePort
-            tls:
-              enabled: false
-            nodePort:
-              ports:
-                http:
-                  nodePort: 30001
-        - externalURL: http://localhost:30001
-        - harborAdminPassword: "admin"
-        - database:
-            type: internal
-        - redis:
-            type: internal
-        - persistence:
-            enabled: true
-            persistentVolumeClaim:
-              {{- range $component := $harborComponents }}
-              {{ $component }}:
-                {{- if ne $component "jobservice" }}
-                existingClaim: "harbor-{{ $component }}-local-pvc"
-                {{- else }}
-                jobLog:
-                  existingClaim: "harbor-{{ $component }}-local-pvc"
-                {{- end }}
-              {{- end }}
-        - trivy:
-            enabled: false
     - name: "rustic-image"
       namespace: "rustic"
       chart: "./rustic-image"
       version: ^0.1.0
       createNamespace: true
-      needs: 
-        - "harbor/harbor"
+      values:
+        - registry:
+            namespace: "benjmanable"
+            username: "ref+file://vars/test/secrets.yaml#/docker_hub/username"
+            password: "ref+file://vars/test/secrets.yaml#/docker_hub/password"
+        - kaniko:
+            secret_content: "{\"auths\": {\"https://index.docker.io/v1/\": {\"auth\": \"{{ printf "%s:%s" ("ref+file://vars/test/secrets.yaml#/docker_hub/username" | fetchSecretValue ) ("ref+file://vars/test/secrets.yaml#/docker_hub/password" | fetchSecretValue ) | b64enc }}\"}}}"
     {{- range $key, $value := $values }}
     - name: "rustic-{{ $key }}"
       namespace: "rustic"
