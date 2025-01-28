@@ -76,32 +76,42 @@ envsubst < /tmp/rustic.template.toml > $HOME/.config/rustic/rustic.toml
 # Create the local mount point if it doesn't exist
 mkdir -p "$SFTP_MOUNT_PATH_IN_DOCKER"
 
-# Set up SSH directory and keys
-SSH_DIR="$HOME/.ssh"
-mkdir -p "$SSH_DIR"
-chmod 700 "$SSH_DIR"
+# Create rclone config directory
+mkdir -p $HOME/.config/rclone
 
-# Write host public key to known_hosts
-echo "[$SFTP_HOST]:$SFTP_PORT $SFTP_HOST_PUBKEY" > "$SSH_DIR/known_hosts"
-chmod 644 "$SSH_DIR/known_hosts"
-
-# Write user private key with a generic name
-PRIV_KEY_FILE="$SSH_DIR/sftp_user_key"
+# Write user private key
+PRIV_KEY_FILE="$HOME/.ssh/sftp_user_key"
+mkdir -p $(dirname "$PRIV_KEY_FILE")
 echo "$SFTP_USER_PRIVKEY" > "$PRIV_KEY_FILE"
 chmod 600 "$PRIV_KEY_FILE"
 
-# Mount the SFTP directory using sshfs
-echo "Mounting SFTP directory..."
-sshfs "${SFTP_USER}@${SFTP_HOST}:${REMOTE_PATH}" "$SFTP_MOUNT_PATH_IN_DOCKER" \
-    -p "$SFTP_PORT" \
-    -o IdentityFile="$PRIV_KEY_FILE" \
-    -o UserKnownHostsFile="$SSH_DIR/known_hosts" \
-    -o StrictHostKeyChecking=yes \
-    -o allow_other \
-    -o reconnect \
-    -o ServerAliveInterval=15
+# Set up trusted host for SSH
+mkdir -p $HOME/.ssh
+echo "$SFTP_HOST $SFTP_HOST_PUBKEY" >> $HOME/.ssh/known_hosts
+chmod 644 $HOME/.ssh/known_hosts
 
-echo "SFTP directory mounted successfully at $SFTP_MOUNT_PATH_IN_DOCKER"
+# Create rclone config
+cat > $HOME/.config/rclone/rclone.conf <<EOF
+[sftp]
+type = sftp
+host = $SFTP_HOST
+user = $SFTP_USER
+port = $SFTP_PORT
+key_file = $PRIV_KEY_FILE
+EOF
+
+# Mount the remote directory using rclone
+echo "Mounting remote directory..."
+rclone mount \
+    sftp:$REMOTE_PATH \
+    $SFTP_MOUNT_PATH_IN_DOCKER \
+    --daemon \
+    --read-only \
+    --allow-other \
+    --vfs-cache-mode full \
+    --vfs-cache-max-size 1Gi
+
+echo "Remote directory mounted successfully at $SFTP_MOUNT_PATH_IN_DOCKER"
 
 # Execute the command passed as arguments
 if [ $# -eq 0 ]; then

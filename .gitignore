@@ -32,4 +32,8 @@ secrets.yaml
 values-secrets.yaml
 
 # Added by benjaminpreiss
-vars/test
+vars/*
+!vars/*/
+vars/*/**
+!vars/*/*.nonce
+!vars/*/*.tar.gz.aes256gcm.enc

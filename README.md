@@ -81,8 +81,13 @@ customer2/
 ### Customer implementation requirements
 
 - Customer needs to implement FTPS (NOT SFTP!) in passive mode (so that we can mount it in docker)
+- Due to the rclone mount --attr-timeout being 1s, the files that are read should not change during backups. i.e. please dont change files while we read them.
 
 ### Test strategy
 
 - We run different deployments on test with different commands that we pass into rustic.
 - Foremost we want to load up our SFTP server with data, run rustic on it (to our local minio) and then restore the data again. We run the rustic container itself as a test then.
+
+### TODO
+
+- Pass through `--vfs-cache-max-size` in entrypoint.sh and Dockerfile as Env variable.

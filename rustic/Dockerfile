@@ -1,7 +1,7 @@
 # Start from the rustic image
 FROM ghcr.io/rustic-rs/rustic:latest as rustic
 
-FROM alpine
+FROM rclone/rclone:latest
 
 COPY --from=rustic / /
 
@@ -12,7 +12,8 @@ RUN apk add --no-cache \
     fuse \
     bash \
     ca-certificates \
-    gettext
+    gettext \
+    s3cmd
 
 # Ensure FUSE is configured for non-root environments
 RUN echo "user_allow_other" >> /etc/fuse.conf

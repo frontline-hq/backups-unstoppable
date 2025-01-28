@@ -2,25 +2,30 @@
 
 # Function to show usage
 usage() {
-    echo "Usage: $0 <directory> <operation> <key>"
+    echo "Usage: $0 <directory> <operation> <key> [<file_path>]"
     echo "  <directory>: The directory to process"
     echo "  <operation>: Either 'encrypt' or 'decrypt'"
     echo "  <key>: 256-bit key in hexadecimal format (64 characters)"
+    echo "  [<file_path>]: Optional path to .nonce and .tar.gz.aes256gcm.enc files (default: ./)"
     echo ""
     echo "Tip: To generate a suitable 256-bit key, you can use the following command:"
     echo "  botan rng --format=hex 32"
 }
 
-# Check if three arguments are provided
-if [ $# -ne 3 ]; then
+# Check if at least three arguments are provided
+if [ $# -lt 3 ]; then
     usage
     exit 1
 fi
 
 # Assign arguments to variables
-DIRECTORY="$1"
+DIRECTORY="${1%/}"  # Remove trailing slash if present
 OPERATION="$2"
 KEY="$3"
+FILE_PATH="${4:-./}"  # Use ./ if not specified
+
+# Ensure FILE_PATH ends with a slash
+FILE_PATH="${FILE_PATH%/}/"
 
 # Check if directory exists
 if [ ! -d "$DIRECTORY" ]; then
@@ -37,8 +42,8 @@ fi
 
 # Get the base name of the directory
 BASE_NAME=$(basename "$DIRECTORY")
-ENCRYPTED_ARCHIVE="${BASE_NAME}.tar.gz.aes256gcm.enc"
-NONCE_FILE="${BASE_NAME}.nonce"
+ENCRYPTED_ARCHIVE="${FILE_PATH}${BASE_NAME}.tar.gz.aes256gcm.enc"
+NONCE_FILE="${FILE_PATH}${BASE_NAME}.nonce"
 
 # Function to encrypt
 encrypt() {
