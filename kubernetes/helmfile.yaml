@@ -68,11 +68,18 @@ repositories:
       url: https://helm.goharbor.io
 
 releases:
+    - name: openebs-helpers
+      namespace: default
+      chart: './openebs-helpers'
+      version: "0.1.0"
+      wait: true
     - name: openebs
       namespace: openebs
       chart: openebs/openebs
       version: ^4.1.2 # Specify the desired version of OpenEBS
       createNamespace: true
+      needs: 
+        - default/openebs-helpers
       wait: true
       hooks:
           - events: ["presync"]
@@ -81,15 +88,6 @@ releases:
             args:
                 - "-c"
                 - "kubectl create namespace openebs --dry-run=client -o yaml | kubectl apply -f -"
-          - events: ["presync"]
-            showlogs: true
-            command: "kubectl"
-            args:
-                - patch
-                - namespace
-                - openebs
-                - -p
-                - '{"metadata": {"labels":{"pod-security.kubernetes.io/enforce": "privileged"}}}'
       set:
           - name: engines.replicated.mayastor.enabled
             value: false
@@ -247,18 +245,6 @@ releases:
                 {{- end }}
     {{- end }}
     {{- end }}
-    - name: "rustic-image"
-      namespace: "rustic"
-      chart: "./rustic-image"
-      version: ^0.1.0
-      createNamespace: true
-      values:
-        - registry:
-            namespace: "benjmanable"
-            username: "ref+file://vars/test/secrets.yaml#/docker_hub/username"
-            password: "ref+file://vars/test/secrets.yaml#/docker_hub/password"
-        - kaniko:
-            secret_content: "{\"auths\": {\"https://index.docker.io/v1/\": {\"auth\": \"{{ printf "%s:%s" ("ref+file://vars/test/secrets.yaml#/docker_hub/username" | fetchSecretValue ) ("ref+file://vars/test/secrets.yaml#/docker_hub/password" | fetchSecretValue ) | b64enc }}\"}}}"
     {{- range $key, $value := $values }}
     - name: "rustic-{{ $key }}"
       namespace: "rustic"
@@ -269,7 +255,6 @@ releases:
       needs:
           - "minio-{{ $value.remote.persisted }}/minio-{{ $value.remote.persisted }}"
           - "sftp/sftp-{{ $key }}"
-          - "rustic/rustic-image"
       {{- end }}
       values:
         - sftp:

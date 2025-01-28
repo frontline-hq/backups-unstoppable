@@ -1,6 +1,6 @@
 apiVersion: v2
-name: rustic-image
-description: A helm chart for rustic image creation
+name: openebs-helpers
+description: A helm chart for openebs helpers
 
 # A chart can be either an 'application' or a 'library' chart.
 #
