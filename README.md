@@ -29,6 +29,11 @@ It seems that setting up the cron job in the container is a setup that's easier 
 
 ## Get started
 
+1. Make sure docker is running
+2. git clone
+3. Install `bats`, the shell testing programm
+4. Run tests: `./test/bats/bin/bats test/test.bats`
+
 ## Threat scenarios
 
 **Scenario A** ✅
@@ -91,3 +96,5 @@ customer2/
 ### TODO
 
 - Pass through `--vfs-cache-max-size` in entrypoint.sh and Dockerfile as Env variable.
+- Setup use_https propertly in entrypoint file through env variables (will need on ramo!)
+- Take all apk-add and source install (mc) dependencies of Dockerfile and make a CI/CD pipeline that rebuilds the image if those change.

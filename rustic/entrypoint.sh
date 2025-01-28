@@ -13,11 +13,13 @@ usage() {
     echo "  --sftp-host-pubkey KEY            SFTP host public key" >&2
     echo "  --sftp-user-privkey KEY           SFTP user private key" >&2
     echo "  --sftp-mount-path PATH            SFTP mount path in Docker" >&2
-    echo "  --remote-endpoint URL             Remote endpoint URL including port" >&2
-    echo "  --remote-bucket-name NAME         Remote bucket name" >&2
-    echo "  --remote-path PATH                Remote path" >&2
-    echo "  --remote-key-id ID                Remote key ID" >&2
-    echo "  --remote-access-key KEY           Remote access key" >&2
+    echo "  --remote-endpoint URL             S3 endpoint URL including port" >&2
+    echo "  --remote-bucket-name NAME         S3 bucket name" >&2
+    echo "  --remote-path PATH                S3 path" >&2
+    echo "  --remote-key-id ID                S3 access key ID" >&2
+    echo "  --remote-access-key KEY           S3 secret access key" >&2
+    echo "  --remote-admin-user NAME          S3 admin username" >&2
+    echo "  --remote-admin-password PASSWORD  S3 admin password" >&2
     echo "  --rustic-encryption-password PWD  Rustic encryption password" >&2
     echo "Or set the corresponding environment variables" >&2
     exit 1
@@ -37,6 +39,8 @@ while [[ $# -gt 0 ]]; do
         --remote-path) REMOTE_PATH="$2"; shift 2 ;;
         --remote-key-id) REMOTE_ACCESS_KEY_ID="$2"; shift 2 ;;
         --remote-access-key) REMOTE_SECRET_ACCESS_KEY="$2"; shift 2 ;;
+        --remote-admin-user) REMOTE_ADMIN_USER="$2"; shift 2 ;;
+        --remote-admin-password) REMOTE_ADMIN_PASSWORD="$2"; shift 2 ;;
         --rustic-encryption-password) RUSTIC_ENCRYPTION_PASSWORD="$2"; shift 2 ;;
         --) shift; break ;;
         -*) echo "Unknown option: $1" >&2; usage ;;
@@ -56,13 +60,15 @@ REMOTE_BUCKET_NAME=${REMOTE_BUCKET_NAME:-$REMOTE_BUCKET_NAME}
 REMOTE_PATH=${REMOTE_PATH:-$REMOTE_PATH}
 REMOTE_ACCESS_KEY_ID=${REMOTE_ACCESS_KEY_ID:-$REMOTE_ACCESS_KEY_ID}
 REMOTE_SECRET_ACCESS_KEY=${REMOTE_SECRET_ACCESS_KEY:-$REMOTE_SECRET_ACCESS_KEY}
+REMOTE_ADMIN_USER=${REMOTE_ADMIN_USER:-$REMOTE_ADMIN_USER}
+REMOTE_ADMIN_PASSWORD=${REMOTE_ADMIN_PASSWORD:-$REMOTE_ADMIN_PASSWORD}
 RUSTIC_ENCRYPTION_PASSWORD=${RUSTIC_ENCRYPTION_PASSWORD:-$RUSTIC_ENCRYPTION_PASSWORD}
 
 # Ensure all necessary information is provided
 if [[ -z "$SFTP_HOST" || -z "$SFTP_USER" || -z "$SFTP_HOST_PUBKEY" || -z "$SFTP_USER_PRIVKEY" || 
       -z "$SFTP_MOUNT_PATH_IN_DOCKER" || -z "$REMOTE_ENDPOINT" || -z "$REMOTE_BUCKET_NAME" || 
       -z "$REMOTE_PATH" || -z "$REMOTE_ACCESS_KEY_ID" || -z "$REMOTE_SECRET_ACCESS_KEY" || 
-      -z "$RUSTIC_ENCRYPTION_PASSWORD" ]]; then
+      -z "$REMOTE_ADMIN_USER" || -z "$REMOTE_ADMIN_PASSWORD" || -z "$RUSTIC_ENCRYPTION_PASSWORD" ]]; then
     echo "Error: Missing required options" >&2
     usage
 fi
@@ -103,7 +109,7 @@ EOF
 # Mount the remote directory using rclone
 echo "Mounting remote directory..."
 rclone mount \
-    sftp:$REMOTE_PATH \
+    sftp:$SFTP_MOUNT_PATH_IN_DOCKER \
     $SFTP_MOUNT_PATH_IN_DOCKER \
     --daemon \
     --read-only \
@@ -112,6 +118,61 @@ rclone mount \
     --vfs-cache-max-size 1Gi
 
 echo "Remote directory mounted successfully at $SFTP_MOUNT_PATH_IN_DOCKER"
+
+# Set up s3cmd configuration
+cat > $HOME/.s3cfg <<EOF
+[default]
+access_key = $REMOTE_ADMIN_USER
+secret_key = $REMOTE_ADMIN_PASSWORD
+host_base = $REMOTE_ENDPOINT
+host_bucket = $REMOTE_ENDPOINT
+use_https = False
+signature_v2 = False
+EOF
+
+# Create bucket if it doesn't exist
+if ! s3cmd ls s3://$REMOTE_BUCKET_NAME > /dev/null 2>&1; then
+    s3cmd mb s3://$REMOTE_BUCKET_NAME
+    echo "Created S3 bucket: $REMOTE_BUCKET_NAME"
+else
+    echo "S3 bucket already exists: $REMOTE_BUCKET_NAME"
+fi
+
+# Set bucket policy for restricted access to REMOTE_PATH
+cat > /tmp/policy.json <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {"AWS": ["*"]},
+            "Action": [
+                "*"
+            ],
+            "Resource": [
+                "arn:aws:s3:::${REMOTE_BUCKET_NAME}${REMOTE_PATH}/*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Principal": {"AWS": ["*"]},
+            "Action": "s3:ListBucket",
+            "Resource": "arn:aws:s3:::$REMOTE_BUCKET_NAME",
+            "Condition": {
+                "StringLike": {
+                    "s3:prefix": [
+                        "${REMOTE_PATH}",
+                        "${REMOTE_PATH}/*"
+                    ]
+                }
+            }
+        }
+    ]
+}
+EOF
+
+s3cmd setpolicy /tmp/policy.json s3://$REMOTE_BUCKET_NAME
+echo "Set restricted access policy for S3 bucket: $REMOTE_BUCKET_NAME, path: $REMOTE_PATH"
 
 # Execute the command passed as arguments
 if [ $# -eq 0 ]; then

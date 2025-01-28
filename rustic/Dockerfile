@@ -1,9 +1,9 @@
-# Start from the rustic image
-FROM ghcr.io/rustic-rs/rustic:latest as rustic
-
 FROM rclone/rclone:latest
 
-COPY --from=rustic / /
+COPY --from=ghcr.io/rustic-rs/rustic:latest / /
+
+# Ensure rustic is in PATH
+ENV PATH="/:${PATH}"
 
 # Install necessary packages
 RUN apk add --no-cache \
@@ -43,10 +43,12 @@ ENV REMOTE_BUCKET_NAME=
 ENV REMOTE_PATH=
 ENV REMOTE_ACCESS_KEY_ID=
 ENV REMOTE_SECRET_ACCESS_KEY=
+ENV REMOTE_ADMIN_USER=
+ENV REMOTE_ADMIN_PASSWORD=
 ENV RUSTIC_ENCRYPTION_PASSWORD=
 
 # Entry point handles mounting the SFTP directory and environment variable substitution
 ENTRYPOINT ["/entrypoint.sh"]
 
 # Default command (can be overridden)
-CMD ["rustic", "--help"]
+CMD ["/rustic", "--help"]
