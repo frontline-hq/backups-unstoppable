@@ -53,7 +53,7 @@ lock() {
     for dir in */; do
         if [ -d "$dir" ]; then
             echo "Locking $dir"
-            "$SCRIPT_DIR/encrypt_decrypt.sh" "$dir" encrypt "$PASSWORD" "$dir"
+            "$SCRIPT_DIR/encrypt_decrypt.sh" "$dir" encrypt "$PASSWORD"
         fi
     done
 }
@@ -63,7 +63,7 @@ unlock() {
     for dir in */; do
         if [ -d "$dir" ]; then
             echo "Unlocking $dir"
-            "$SCRIPT_DIR/encrypt_decrypt.sh" "$dir" decrypt "$PASSWORD" "$dir"
+            "$SCRIPT_DIR/encrypt_decrypt.sh" "$dir" decrypt "$PASSWORD"
         fi
     done
 }
