@@ -45,9 +45,6 @@ warn('ℹ️ Open {tiltfile_path} in your favorite editor to get started.'.forma
 #              ]
 # )
 
-# Build rustic image
-docker_build('benjmanable/rustic', './rustic')
-
 # Helper function to read K8s config YAML from helmfile.
 def helmfile(file):
   watch_file(file)
