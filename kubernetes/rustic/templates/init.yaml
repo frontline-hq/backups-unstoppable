@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "rustic.fullname" . }}-init-test"
+  labels:
+    {{- include "rustic.labels" . | nindent 4 }}
+spec:
+  containers:
+    - name: rustic-backup
+      image: "benjmanable/rustic:latest"
+      command: ["rustic"]
+      args: ["-v"]
+      env:
+        - name: SFTP_HOST
+          value: {{ .Values.sftp.host | quote }}
+        - name: SFTP_PORT
+          value: {{ .Values.sftp.port | quote }}
+        - name: SFTP_USER
+          value: {{ .Values.sftp.user | quote }}
+        - name: SFTP_HOST_PUBKEY
+          value: {{ .Values.sftp.host_pubkey | quote }}
+        - name: SFTP_USER_PRIVKEY
+          value: {{ .Values.sftp.user_privkey | quote }}
+        - name: SFTP_MOUNT_PATH_IN_DOCKER
+          value: {{ .Values.sftp.mount_path_in_docker | quote }}
+        - name: REMOTE_ENDPOINT
+          value: {{ .Values.remote.endpoint | quote }}
+        - name: REMOTE_BUCKET_NAME
+          value: {{ .Values.remote.bucket_name | quote }}
+        - name: REMOTE_PATH
+          value: {{ .Values.remote.path | quote }}
+        - name: REMOTE_ACCESS_KEY_ID
+          value: {{ .Values.remote.access_key_id | quote }}
+        - name: REMOTE_SECRET_ACCESS_KEY
+          value: {{ .Values.remote.secret_access_key | quote }}
+        - name: RUSTIC_ENCRYPTION_PASSWORD
+          value: {{ .Values.rustic.encryption_password | quote }}
+  restartPolicy: Never
