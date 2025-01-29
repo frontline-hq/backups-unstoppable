@@ -2,7 +2,7 @@ services:
   rustic:
     image: rustic-image:latest
     build:
-      context: ./rustic
+      context: ./src
     devices:
       - "/dev/fuse:/dev/fuse"
     cap_add:

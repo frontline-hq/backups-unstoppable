@@ -12,7 +12,7 @@ perform_test() {
 }
 
 setup_file() {
-    docker build -t rustic-image:latest ./rustic
+    docker build -t rustic-image:latest ./src
     docker-compose --env-file ./vars/test/.env -f ./test/docker-compose.yaml up \
         --detach \
         --remove-orphans
