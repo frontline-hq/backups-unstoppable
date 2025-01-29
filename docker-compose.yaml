@@ -26,6 +26,7 @@ services:
       VFS_CACHE_MAX_SIZE: "${VFS_CACHE_MAX_SIZE}"
     networks:
       - test-net
+    command: "${COMMAND}"
 networks:
   test-net:
     name: test-net-external
