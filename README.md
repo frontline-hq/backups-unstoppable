@@ -98,3 +98,4 @@ customer2/
 - Pass through `--vfs-cache-max-size` in entrypoint.sh and Dockerfile as Env variable.
 - Setup use_https propertly in entrypoint file through env variables (will need on ramo!)
 - Take all apk-add and source install (mc) dependencies of Dockerfile and make a CI/CD pipeline that rebuilds the image if those change.
+- Setup known_hosts for rclone. Removing this due to a bug.

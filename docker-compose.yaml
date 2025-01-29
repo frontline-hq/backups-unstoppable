@@ -1,19 +1,20 @@
 services:
   rustic:
+    image: rustic-image:latest
     build:
       context: ./rustic
-      dockerfile: Dockerfile
     devices:
       - "/dev/fuse:/dev/fuse"
     cap_add:
       - SYS_ADMIN
+    volumes:
+      - ./vars/test/rclone.conf.template:/tmp/rclone.conf.template
     environment:
       SFTP_HOST: "${SFTP_HOST}"
       SFTP_PORT: "${SFTP_PORT}"
       SFTP_USER: "${SFTP_USER}"
       SFTP_HOST_PUBKEY: "${SFTP_HOST_PUBKEY}"
       SFTP_USER_PRIVKEY: "${SFTP_USER_PRIVKEY}"
-      SFTP_MOUNT_PATH_IN_DOCKER: "${SFTP_MOUNT_PATH_IN_DOCKER}"
       REMOTE_ENDPOINT: "${REMOTE_ENDPOINT}"
       REMOTE_BUCKET_NAME: "${REMOTE_BUCKET_NAME}"
       REMOTE_PATH: "${REMOTE_PATH}"
@@ -22,9 +23,10 @@ services:
       REMOTE_ADMIN_USER: "${REMOTE_ADMIN_USER}"
       REMOTE_ADMIN_PASSWORD: "${REMOTE_ADMIN_PASSWORD}"
       RUSTIC_ENCRYPTION_PASSWORD: "${RUSTIC_ENCRYPTION_PASSWORD}"
+      VFS_CACHE_MAX_SIZE: "${VFS_CACHE_MAX_SIZE}"
     networks:
       - test-net
 networks:
   test-net:
-    external:
-      name: test-net-external
+    name: test-net-external
+    external: true
