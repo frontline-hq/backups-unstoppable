@@ -99,3 +99,10 @@ customer2/
 - Setup use_https propertly in entrypoint file through env variables (will need on ramo!)
 - Take all apk-add and source install (mc) dependencies of Dockerfile and make a CI/CD pipeline that rebuilds the image if those change.
 - Setup known_hosts for rclone. Removing this due to a bug.
+- Unify directory structures - Put all persisted data (rclone and rustic cache, rustic backup hot repo, rustic backup data) into one directory.
+
+### Principles
+
+- Contract cancellation only by personal identification of a company employee
+- If funds run out or payments are discountinued we will contact the company personally
+- Emergency contact information that is company unrelated (not work cell)

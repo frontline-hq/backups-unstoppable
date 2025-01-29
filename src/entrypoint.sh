@@ -110,19 +110,17 @@ mkdir -p "${HOME}/.config/rustic"
 envsubst < /tmp/rustic.template.toml > "${HOME}/.config/rustic/rustic.toml"
 
 # Create the local mount point if it doesn't exist
-MOUNT_PATH="${HOME}/rclone-mount"
-mkdir -p "$MOUNT_PATH"
+RCLONE_MOUNT_PATH="${HOME}/rclone/mount"
+mkdir -p "$RCLONE_MOUNT_PATH"
 
 if [ -n "$SFTP_HOST" ]; then
     # SFTP configuration is needed
     mkdir -p "${HOME}/.ssh"
-    chown appuser:appgroup "${HOME}/.ssh"
     chmod 700 "${HOME}/.ssh"
     if [ -n "$SFTP_USER_PRIVKEY" ]; then
         PRIV_KEY_FILE="${HOME}/.ssh/rclone_key"
         mkdir -p $(dirname "$PRIV_KEY_FILE")
         echo "$SFTP_USER_PRIVKEY" > "$PRIV_KEY_FILE"
-        chown appuser:appgroup "$PRIV_KEY_FILE"
         chmod 600 "$PRIV_KEY_FILE"
         echo "Created user priv key at ${PRIV_KEY_FILE}"
     fi
@@ -140,17 +138,22 @@ else
     echo "No SFTP configuration needed."
 fi
 
+# Create the rclone cache directory if it doesnt exist
+RCLONE_CACHE_DIR="${HOME}/rclone/cache"
+mkdir -p "$RCLONE_CACHE_DIR"
+
 # Mount the remote directory using rclone
 rclone mount \
     origin:$REMOTE_PATH \
-    $MOUNT_PATH \
+    $RCLONE_MOUNT_PATH \
     --daemon \
     --read-only \
     --allow-other \
     --vfs-cache-mode full \
-    --vfs-cache-max-size $VFS_CACHE_MAX_SIZE
+    --vfs-cache-max-size $VFS_CACHE_MAX_SIZE \
+    --cache-dir "$RCLONE_CACHE_DIR"
 
-echo "Remote directory mounted successfully at $MOUNT_PATH"
+echo "Remote directory mounted successfully at $RCLONE_MOUNT_PATH"
 
 # Set up s3cmd configuration
 cat > "${HOME}/.s3cfg" <<EOF

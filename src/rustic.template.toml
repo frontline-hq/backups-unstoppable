@@ -1,8 +1,8 @@
 [repository]
 repository = "opendal:s3"
-repo-hot = "/backup/rustic"
+repo-hot = "/persisted/rustic/repo_hot"
 password = "$RUSTIC_ENCRYPTION_PASSWORD"
-cache-dir = "/persisted/rustic-cache"
+cache-dir = "/persisted/rustic/cache"
 
 # options only for hot part
 [repository.options-hot]
