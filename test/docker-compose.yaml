@@ -15,6 +15,18 @@ services:
     command: server /data --console-address ":9001"
     networks:
       - test-net
+  minio-waiter:
+    image: busybox
+    depends_on:
+      - minio
+    command: >
+      /bin/sh -c "
+        while ! nc -z minio 9000; do
+          echo 'Waiting for Minio...';
+          sleep 1;
+        done;
+        echo 'Minio is up!';
+      "
 networks:
   test-net:
     name: test-net-external

@@ -1,3 +1,4 @@
+ARG ENV=production
 FROM rclone/rclone:latest
 
 COPY --from=ghcr.io/rustic-rs/rustic:latest / /
@@ -12,7 +13,7 @@ RUN apk add --no-cache \
     bash \
     ca-certificates \
     gettext \
-    s3cmd
+    openssl
 
 # Ensure FUSE is configured for non-root environments
 RUN echo "user_allow_other" >> /etc/fuse.conf
@@ -20,6 +21,10 @@ RUN echo "user_allow_other" >> /etc/fuse.conf
 # Add the entrypoint script
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+# Add script to generate backup data for testing
+COPY genbackupdata.sh /tmp/genbackupdata.sh
+RUN chmod +x /tmp/genbackupdata.sh
 
 # Create a group and user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup

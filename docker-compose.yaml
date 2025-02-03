@@ -3,6 +3,8 @@ services:
     image: rustic-image:latest
     build:
       context: ./src
+      args:
+        ENV: "${ENV}"
     devices:
       - "/dev/fuse:/dev/fuse"
     cap_add:

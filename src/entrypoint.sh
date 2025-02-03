@@ -14,8 +14,6 @@ usage() {
     echo "  REMOTE_PATH                S3 path" >&2
     echo "  REMOTE_ACCESS_KEY_ID       S3 access key ID" >&2
     echo "  REMOTE_SECRET_ACCESS_KEY   S3 secret access key" >&2
-    echo "  REMOTE_ADMIN_USER          S3 admin username" >&2
-    echo "  REMOTE_ADMIN_PASSWORD      S3 admin password" >&2
     echo "  RUSTIC_ENCRYPTION_PASSWORD Rustic encryption password" >&2
     echo "  VFS_CACHE_MAX_SIZE         rclone VFS cache max size (e.g., 1Gi)" >&2
     echo >&2
@@ -56,8 +54,6 @@ required_vars=(
     "REMOTE_PATH"
     "REMOTE_ACCESS_KEY_ID"
     "REMOTE_SECRET_ACCESS_KEY"
-    "REMOTE_ADMIN_USER"
-    "REMOTE_ADMIN_PASSWORD"
     "RUSTIC_ENCRYPTION_PASSWORD"
     "VFS_CACHE_MAX_SIZE"
 )
@@ -155,65 +151,11 @@ rclone mount \
 
 echo "Remote directory mounted successfully at $RCLONE_MOUNT_PATH"
 
-# Set up s3cmd configuration
-cat > "${HOME}/.s3cfg" <<EOF
-[default]
-access_key = $REMOTE_ADMIN_USER
-secret_key = $REMOTE_ADMIN_PASSWORD
-host_base = $REMOTE_ENDPOINT
-host_bucket = $REMOTE_ENDPOINT
-use_https = False
-signature_v2 = False
-EOF
-
-# Create bucket if it doesn't exist
-if ! s3cmd ls s3://$REMOTE_BUCKET_NAME > /dev/null 2>&1; then
-    s3cmd mb s3://$REMOTE_BUCKET_NAME
-    echo "Created S3 bucket: $REMOTE_BUCKET_NAME"
-else
-    echo "S3 bucket already exists: $REMOTE_BUCKET_NAME"
-fi
-
-# Set bucket policy for restricted access to REMOTE_PATH
-cat > /tmp/policy.json <<EOF
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Principal": {"AWS": ["*"]},
-            "Action": [
-                "*"
-            ],
-            "Resource": [
-                "arn:aws:s3:::${REMOTE_BUCKET_NAME}${REMOTE_PATH}/*"
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Principal": {"AWS": ["*"]},
-            "Action": "s3:ListBucket",
-            "Resource": "arn:aws:s3:::$REMOTE_BUCKET_NAME",
-            "Condition": {
-                "StringLike": {
-                    "s3:prefix": [
-                        "${REMOTE_PATH}",
-                        "${REMOTE_PATH}/*"
-                    ]
-                }
-            }
-        }
-    ]
-}
-EOF
-
-s3cmd setpolicy /tmp/policy.json s3://$REMOTE_BUCKET_NAME
-echo "Set restricted access policy for S3 bucket: $REMOTE_BUCKET_NAME, path: $REMOTE_PATH"
-
 # Execute the command passed as arguments
 if [ $# -eq 0 ]; then
     echo "No command provided. Please provide a command to execute."
     exit 1
 else
+    cd "${HOME}/.config/rustic/"
     exec "$@"
 fi
