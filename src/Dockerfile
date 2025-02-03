@@ -29,6 +29,10 @@ RUN chmod +x /tmp/genbackupdata.sh
 # Create a group and user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
+# Create persisted dir for persisted data
+RUN mkdir -p /persisted
+RUN chown appuser:appgroup /persisted
+
 # Tell docker that all future commands should run as the appuser user
 USER appuser
 
