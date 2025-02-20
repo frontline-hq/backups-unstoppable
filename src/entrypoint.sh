@@ -14,6 +14,8 @@ usage() {
     echo "  REMOTE_PATH                S3 path" >&2
     echo "  REMOTE_ACCESS_KEY_ID       S3 access key ID" >&2
     echo "  REMOTE_SECRET_ACCESS_KEY   S3 secret access key" >&2
+    echo "  REMOTE_STORAGE_CLASS       S3 storage class" >&2
+    echo "  REMOTE_REGION              S3 region" >&2
     echo "  RUSTIC_ENCRYPTION_PASSWORD Rustic encryption password" >&2
     echo "  VFS_CACHE_MAX_SIZE         rclone VFS cache max size (e.g., 1Gi)" >&2
     echo >&2
@@ -54,6 +56,8 @@ required_vars=(
     "REMOTE_PATH"
     "REMOTE_ACCESS_KEY_ID"
     "REMOTE_SECRET_ACCESS_KEY"
+    "REMOTE_STORAGE_CLASS"
+    "REMOTE_REGION"
     "RUSTIC_ENCRYPTION_PASSWORD"
     "VFS_CACHE_MAX_SIZE"
 )

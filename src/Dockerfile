@@ -13,7 +13,8 @@ RUN apk add --no-cache \
     bash \
     ca-certificates \
     gettext \
-    openssl
+    openssl \
+    diffoscope
 
 # Ensure FUSE is configured for non-root environments
 RUN echo "user_allow_other" >> /etc/fuse.conf
