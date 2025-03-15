@@ -1,0 +1,9 @@
+#!/bin/bash
+
+# Run docker-compose with project-specific name
+docker-compose \
+  --env-file "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/vars/.env" \
+  -f {{ base_app_path }}/{{ client_name }}/{{ project_name }}/docker-compose.yml \
+  -p "backup_{{ client_name }}_{{ project_name }}" \
+  run \
+  --exit-code-from rustic

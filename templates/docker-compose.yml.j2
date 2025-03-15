@@ -1,0 +1,53 @@
+services:
+{% if create_sftp | bool %}
+  sftp:
+    image: atmoz/sftp
+    container_name: sftp_{{ client_name }}_{{ project_name }}
+    restart: always
+    volumes:
+      - {{ base_app_path }}/{{ client_name }}/{{ project_name }}/vars/host_id_ed25519:/etc/ssh/ssh_host_ed25519_key:ro
+      - {{ base_app_path }}/{{ client_name }}/{{ project_name }}/vars/user_id_ed25519.pub:/home/sftpuser/.ssh/keys/id_ed25519.pub:ro
+      - {{ base_app_path }}/{{ client_name }}/{{ project_name }}/persisted/sftp:/home/sftpuser:ro
+    command: "${SFTP_USER}::1001"
+    networks:
+      - backup-net
+{% endif %}
+
+  rustic:
+    image: rustic-image:latest
+    container_name: rustic_{{ client_name }}_{{ project_name }}
+    build:
+      context: {{ base_app_path }}/{{ client_name }}/{{ project_name }}/src
+      args:
+        ENV: "${ENV}"
+    devices:
+      - "/dev/fuse:/dev/fuse"
+    cap_add:
+      - SYS_ADMIN
+    volumes:
+      - {{ base_app_path }}/{{ client_name }}/{{ project_name }}/vars/rclone.conf.template:/tmp/rclone.conf.template:ro
+      - {{ base_app_path }}/{{ client_name }}/{{ project_name }}/persisted/rustic:/persisted
+    environment:
+      SFTP_HOST: "${SFTP_HOST}"
+      SFTP_PORT: "${SFTP_PORT}"
+      SFTP_USER: "${SFTP_USER}"
+      SFTP_HOST_PUBKEY: "${SFTP_HOST_PUBKEY}"
+      SFTP_USER_PRIVKEY: "${SFTP_USER_PRIVKEY}"
+      REMOTE_ENDPOINT: "${REMOTE_ENDPOINT}"
+      REMOTE_BUCKET_NAME: "${REMOTE_BUCKET_NAME}"
+      REMOTE_PATH: "${REMOTE_PATH}"
+      REMOTE_ACCESS_KEY_ID: "${REMOTE_ACCESS_KEY_ID}"
+      REMOTE_SECRET_ACCESS_KEY: "${REMOTE_SECRET_ACCESS_KEY}"
+      REMOTE_REGION: "${REMOTE_REGION}"
+      REMOTE_STORAGE_CLASS: "${REMOTE_STORAGE_CLASS}"
+      RUSTIC_ENCRYPTION_PASSWORD: "${RUSTIC_ENCRYPTION_PASSWORD}"
+      VFS_CACHE_MAX_SIZE: "${VFS_CACHE_MAX_SIZE}"
+      RCLONE_MOUNT_PATH: "${RCLONE_MOUNT_PATH}"
+      ORIGIN_PATH: "${ORIGIN_PATH}"
+    networks:
+      - backup-net
+    command: "${COMMAND}"
+
+networks:
+  backup-net:
+    name: backup-net-{{ client_name }}-{{ project_name }}

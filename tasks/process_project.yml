@@ -1,0 +1,131 @@
+---
+- name: Ensure Docker and Docker Compose are installed
+  block:
+    - name: Install Docker dependencies
+      package:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install Docker
+      package:
+        name: docker-ce
+        state: present
+
+    - name: Install Docker Compose
+      get_url:
+        url: "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-linux-x86_64"
+        dest: /usr/local/bin/docker-compose
+        mode: "0755"
+
+    - name: Ensure Docker service is running
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+- name: Ensure flock is installed
+  package:
+    name: util-linux
+    state: present
+
+- name: Create application directory
+  file:
+    path: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0755"
+
+- name: Create log directory
+  file:
+    path: "{{ base_log_path }}/{{ client_name }}/{{ project_name }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0755"
+
+- name: Create lock directory
+  file:
+    path: "{{ lock_file_path }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0755"
+
+- name: Copy script files
+  copy:
+    src: "src/"
+    dest: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/src/"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: preserve
+
+- name: Generate backup data for SFTP
+  block:
+    - name: Create SFTP data directory
+      file:
+        path: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/persisted/sftp"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0755"
+
+    - name: Generate backup data
+      command:
+        cmd: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/src/genbackupdata.sh -c {{ backup_size }} -s {{ backup_seed }} {{ base_app_path }}/{{ client_name }}/{{ project_name }}/persisted/sftp/backup_data"
+      args:
+        creates: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/persisted/sftp/backup_data"
+  when: project_vars.create_sftp | bool
+
+- name: Copy project files
+  copy:
+    src: "vars/production/{{ client_name }}/{{ project_name }}/"
+    dest: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/vars/"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: preserve
+
+- name: Deploy run script
+  template:
+    src: templates/run.sh.j2
+    dest: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/run.sh"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0755"
+
+- name: Deploy docker-compose file
+  template:
+    src: templates/docker-compose.yml.j2
+    dest: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/docker-compose.yml"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0755"
+
+- name: Install cron job with flock
+  cron:
+    name: "Run {{ client_name }} - {{ project_name }}"
+    user: "{{ app_user }}"
+    job: "flock -n {{ lock_file_path }}/{{ client_name }}_{{ project_name }}.lock {{ base_app_path }}/{{ client_name }}/{{ project_name }}/run.sh >> {{ base_log_path }}/{{ client_name }}/{{ project_name }}/app.log 2>&1"
+    minute: "{{ project_vars.schedule.split(' ')[0] }}"
+    hour: "{{ project_vars.schedule.split(' ')[1] }}"
+    day: "{{ project_vars.schedule.split(' ')[2] }}"
+    month: "{{ project_vars.schedule.split(' ')[3] }}"
+    weekday: "{{ project_vars.schedule.split(' ')[4] }}"

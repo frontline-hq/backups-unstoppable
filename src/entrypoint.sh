@@ -3,8 +3,9 @@
 # Fail on any error
 set -e
 
-# Fail on any error
-set -e
+# Set default values
+RCLONE_MOUNT_PATH="${RCLONE_MOUNT_PATH:-${HOME}/rclone/mount}"
+ORIGIN_PATH="${ORIGIN_PATH:-/}"
 
 usage() {
     echo "Usage: $0" >&2
@@ -18,6 +19,8 @@ usage() {
     echo "  REMOTE_REGION              S3 region" >&2
     echo "  RUSTIC_ENCRYPTION_PASSWORD Rustic encryption password" >&2
     echo "  VFS_CACHE_MAX_SIZE         rclone VFS cache max size (e.g., 1Gi)" >&2
+    echo "  RCLONE_MOUNT_PATH          Custom mount path (optional, defaults to ${HOME}/rclone/mount)" >&2
+    echo "  ORIGIN_PATH                Path on origin to mount (optional, defaults to /)" >&2
     echo >&2
     echo "Ensure that a rclone.conf.template file is mounted to the docker container at:" >&2
     echo "  ${HOME}/rclone.conf.template" >&2
@@ -110,7 +113,6 @@ mkdir -p "${HOME}/.config/rustic"
 envsubst < /tmp/rustic.template.toml > "${HOME}/.config/rustic/rustic.toml"
 
 # Create the local mount point if it doesn't exist
-RCLONE_MOUNT_PATH="${HOME}/rclone/mount"
 mkdir -p "$RCLONE_MOUNT_PATH"
 
 if [ -n "$SFTP_HOST" ]; then
@@ -144,7 +146,7 @@ mkdir -p "$RCLONE_CACHE_DIR"
 
 # Mount the remote directory using rclone
 rclone mount \
-    origin:$REMOTE_PATH \
+    origin:$ORIGIN_PATH \
     $RCLONE_MOUNT_PATH \
     --daemon \
     --read-only \

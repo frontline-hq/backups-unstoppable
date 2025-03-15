@@ -1,0 +1,8 @@
+base_app_path: /opt/applications/backup_service
+base_log_path: /var/log/applications/backup_service
+lock_file_path: /var/lock/applications/backup_service
+app_user: appuser
+app_group: appgroup
+sftp_root: /sftp
+backup_size: 1073741824 # 1GB
+backup_seed: 12345 # Fixed seed for deterministic data generation
