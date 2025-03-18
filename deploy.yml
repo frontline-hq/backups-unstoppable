@@ -1,9 +1,56 @@
 ---
-- name: Deploy client applications and setup SFTP server
+- name: Apply client applications and setup SFTP server
   hosts: all
-  become: yes
+  become: true # Keep this if you need sudo privileges
+  become_method: sudo
+
+  vars:
+    ansible_become_flags: -H -S # More secure sudo flags
+
+  handlers:
+    - import_tasks: handlers/main.yml
+
+  pre_tasks:
+    - name: Check if system is Debian
+      fail:
+        msg: "This playbook is designed for Debian systems"
+      when: ansible_os_family != "Debian"
+
+    - name: Check Debian version
+      fail:
+        msg: "This playbook requires Debian 12 (Bookworm) or later"
+      when: ansible_distribution_major_version|int < 12 and ansible_distribution == "Debian"
+
+    - name: Check connectivity and permissions
+      ping:
+      become: false
+
+    - name: Verify FUSE availability
+      command: modprobe fuse
+      changed_when: false
+      become: true
+
+    - name: Check Docker version
+      command: docker --version
+      register: docker_version
+      failed_when: docker_version.rc != 0
+      changed_when: false
+      become: false
 
   tasks:
+    - name: Set restrictive permissions on service directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0750"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+      loop:
+        - "{{ base_app_path }}"
+        - "{{ base_log_path }}"
+        - "{{ lock_file_path }}"
+      become: true
+
     - name: Find all client directories
       find:
         paths: vars/production
@@ -11,6 +58,7 @@
       register: client_dirs
       delegate_to: localhost
       run_once: true
+      become: false # Local tasks don't need sudo
 
     - name: Find project directories for each client
       find:
@@ -20,11 +68,13 @@
       loop: "{{ client_dirs.files }}"
       delegate_to: localhost
       run_once: true
+      become: false # Local tasks don't need sudo
 
     - name: Flatten project directories list
       set_fact:
         all_projects: "{{ project_dirs.results | map(attribute='files') | flatten }}"
       run_once: true
+      become: false # Local tasks don't need sudo
 
     - name: Process each project
       include_tasks: tasks/process_project.yml
@@ -41,3 +91,11 @@
         name: "{{ app_user }}"
         groups: docker
         append: yes
+      become: true # Explicitly need sudo for this task
+
+    - name: Verify no world-writable directories exist
+      command: find {{ base_app_path }} -type d -perm -o+w
+      register: writable_dirs
+      failed_when: writable_dirs.stdout != ""
+      changed_when: false
+      become: true

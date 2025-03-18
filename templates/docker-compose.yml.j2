@@ -1,14 +1,24 @@
 services:
-{% if create_sftp | bool %}
+{% if project_vars.create_sftp | bool %}
   sftp:
     image: atmoz/sftp
     container_name: sftp_{{ client_name }}_{{ project_name }}
     restart: always
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    cap_drop:
+      - ALL
     volumes:
       - {{ base_app_path }}/{{ client_name }}/{{ project_name }}/vars/host_id_ed25519:/etc/ssh/ssh_host_ed25519_key:ro
       - {{ base_app_path }}/{{ client_name }}/{{ project_name }}/vars/user_id_ed25519.pub:/home/sftpuser/.ssh/keys/id_ed25519.pub:ro
       - {{ base_app_path }}/{{ client_name }}/{{ project_name }}/persisted/sftp:/home/sftpuser:ro
     command: "${SFTP_USER}::1001"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - backup-net
 {% endif %}
@@ -20,13 +30,25 @@ services:
       context: {{ base_app_path }}/{{ client_name }}/{{ project_name }}/src
       args:
         ENV: "${ENV}"
+    security_opt:
+      - no-new-privileges:true
+    privileged: false
     devices:
       - "/dev/fuse:/dev/fuse"
+    cap_drop:
+      - ALL
     cap_add:
       - SYS_ADMIN
     volumes:
       - {{ base_app_path }}/{{ client_name }}/{{ project_name }}/vars/rclone.conf.template:/tmp/rclone.conf.template:ro
       - {{ base_app_path }}/{{ client_name }}/{{ project_name }}/persisted/rustic:/persisted
+    tmpfs:
+      - /tmp:size=100M,exec,nosuid
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       SFTP_HOST: "${SFTP_HOST}"
       SFTP_PORT: "${SFTP_PORT}"
