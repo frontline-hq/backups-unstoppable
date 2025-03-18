@@ -1,0 +1,8 @@
+---
+- name: System setup (root tasks)
+  import_playbook: playbooks/setup.yml
+  tags: ["setup"]
+
+- name: Deploy backups (app user tasks)
+  import_playbook: playbooks/deploy.yml
+  tags: ["deploy"]

@@ -1,81 +1,4 @@
 ---
-- name: Create app group
-  group:
-    name: "{{ app_group }}"
-    state: present
-  become: true
-
-- name: Create app user
-  user:
-    name: "{{ app_user }}"
-    group: "{{ app_group }}"
-    shell: /bin/bash
-    state: present
-    system: yes
-  become: true
-
-- name: Ensure cron is installed
-  package:
-    name: cron
-    state: present
-    update_cache: yes
-    cache_valid_time: 3600
-  become: true
-  notify: Start cron service
-
-- name: Ensure Docker and Docker Compose are installed
-  block:
-    - name: Update apt cache
-      apt:
-        update_cache: yes
-        cache_valid_time: 3600
-      when: ansible_os_family == "Debian"
-      become: true
-
-    - name: Install Docker dependencies
-      package:
-        name:
-          - apt-transport-https
-          - ca-certificates
-          - curl
-          - gnupg
-          - lsb-release
-        state: present
-      when: ansible_os_family == "Debian"
-      become: true
-
-    - name: Download Docker install script
-      get_url:
-        url: https://get.docker.com
-        dest: /tmp/get-docker.sh
-        mode: "0755"
-      become: true
-
-    - name: Run Docker install script
-      command: /tmp/get-docker.sh
-      become: true
-      when: not ansible_check_mode
-
-    - name: Remove Docker install script
-      file:
-        path: /tmp/get-docker.sh
-        state: absent
-      become: true
-
-    - name: Ensure Docker service is running
-      service:
-        name: docker
-        state: started
-        enabled: yes
-      become: true
-      when: not ansible_check_mode
-
-- name: Ensure flock is installed
-  package:
-    name: util-linux
-    state: present
-  become: true
-
 - name: Create application directory
   file:
     path: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}"
@@ -83,7 +6,6 @@
     owner: "{{ app_user }}"
     group: "{{ app_group }}"
     mode: "0750"
-  become: true
 
 - name: Create log directory
   file:
@@ -92,25 +14,14 @@
     owner: "{{ app_user }}"
     group: "{{ app_group }}"
     mode: "0750"
-  become: true
-
-- name: Create lock directory
-  file:
-    path: "{{ lock_file_path }}"
-    state: directory
-    owner: "{{ app_user }}"
-    group: "{{ app_group }}"
-    mode: "0750"
-  become: true
 
 - name: Copy script files
   copy:
-    src: "src/"
+    src: "{{ playbook_dir }}/../src/"
     dest: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/src/"
     owner: "{{ app_user }}"
     group: "{{ app_group }}"
     mode: preserve
-  become: true
 
 - name: Generate backup data for SFTP
   block:
@@ -121,86 +32,67 @@
         owner: "{{ app_user }}"
         group: "{{ app_group }}"
         mode: "0750"
-      become: true
 
     - name: Generate backup data
       command:
-        cmd: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/src/genbackupdata.sh -c {{ backup_size }} -s {{ backup_seed }} -q {{ base_app_path }}/{{ client_name }}/{{ project_name }}/persisted/sftp/backup_data"
+        cmd: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/src/genbackupdata.sh -c {{ backup_size }} -s {{ backup_seed }} {{ base_app_path }}/{{ client_name }}/{{ project_name }}/persisted/sftp/backup_data"
       args:
         creates: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/persisted/sftp/backup_data"
       register: backup_result
-      become: true
 
     - name: Debug backup generation
       debug:
         var: backup_result
       when: backup_result is changed
-
-    - name: Set ownership recursively
-      file:
-        path: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/persisted"
-        owner: "{{ app_user }}"
-        group: "{{ app_group }}"
-        mode: "u=rwX,g=rX,o="
-        recurse: yes
-      become: true
   when: project_vars.create_sftp | bool
 
 - name: Copy project files
   copy:
-    src: "vars/production/{{ client_name }}/{{ project_name }}/"
+    src: "{{ playbook_dir }}/../vars/production/{{ client_name }}/{{ project_name }}/"
     dest: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/vars/"
     owner: "{{ app_user }}"
     group: "{{ app_group }}"
     mode: "0640"
+  # Needed to set file ownership and permissions as root
   become: true
+  become_user: "{{ app_user }}"
 
 - name: Deploy run script
   template:
-    src: templates/run.sh.j2
+    src: "{{ playbook_dir }}/templates/run.sh.j2"
     dest: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/run.sh"
     owner: "{{ app_user }}"
     group: "{{ app_group }}"
     mode: "0750"
+  # Needed to set file ownership and execution permissions as root
   become: true
+  become_user: "{{ app_user }}"
 
 - name: Deploy docker-compose file
   template:
-    src: templates/docker-compose.yml.j2
+    src: "{{ playbook_dir }}/templates/docker-compose.yml.j2"
     dest: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/docker-compose.yml"
     owner: "{{ app_user }}"
     group: "{{ app_group }}"
     mode: "0640"
+  # Needed to set file ownership and permissions as root
   become: true
+  become_user: "{{ app_user }}"
 
 - name: Set restrictive permissions on application root
   file:
     path: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}"
     mode: "0750"
     recurse: yes
+  # Needed to recursively set permissions as root
   become: true
 
 - name: Test backup system
   block:
-    - name: Verify FUSE availability
-      command: modprobe fuse
-      changed_when: false
-      become: true
-
-    - name: Create temporary script directory
-      file:
-        path: "/tmp/ansible-{{ client_name }}-{{ project_name }}"
-        state: directory
-        mode: "0750"
-        owner: "{{ app_user }}"
-        group: "{{ app_group }}"
-      become: true
-
     - name: Run initial backup test
-      shell: |
-        set -e
-        cd "{{ base_app_path }}/{{ client_name }}/{{ project_name }}"
-        ./run.sh
+      command:
+        cmd: "./run.sh"
+        chdir: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}"
       become: true
       become_user: "{{ app_user }}"
       register: backup_test
@@ -230,6 +122,7 @@
         day: "{{ project_vars.schedule.split(' ')[2] }}"
         month: "{{ project_vars.schedule.split(' ')[3] }}"
         weekday: "{{ project_vars.schedule.split(' ')[4] }}"
+      # Needed to install cron job as root
       become: true
       when: not ansible_check_mode
 

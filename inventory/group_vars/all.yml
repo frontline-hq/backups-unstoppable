@@ -4,5 +4,5 @@ lock_file_path: /var/lock/applications/backup_service
 app_user: appuser
 app_group: appgroup
 sftp_root: /sftp
-backup_size: 52428800 # 1GB
+backup_size: 52428800 # 50MB
 backup_seed: 12345 # Fixed seed for deterministic data generation

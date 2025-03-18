@@ -1,0 +1,13 @@
+---
+- name: Deploy and update backup configurations
+  hosts: all
+  become: false
+  become_user: "{{ app_user }}"
+
+  pre_tasks:
+    - name: Check connectivity and permissions
+      ping:
+
+  tasks:
+    - name: Deploy backup tasks
+      import_tasks: tasks/app_tasks.yml

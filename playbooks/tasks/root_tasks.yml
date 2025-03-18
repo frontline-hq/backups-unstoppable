@@ -1,0 +1,92 @@
+---
+- name: Create app group
+  group:
+    name: "{{ app_group }}"
+    state: present
+
+- name: Create app user
+  user:
+    name: "{{ app_user }}"
+    group: "{{ app_group }}"
+    shell: /bin/bash
+    state: present
+    system: yes
+    create_home: yes
+    home: "/home/{{ app_user }}"
+
+- name: Ensure cron is installed
+  package:
+    name: cron
+    state: present
+    update_cache: yes
+    cache_valid_time: 3600
+  notify: Start cron service
+
+- name: Ensure Docker and Docker Compose are installed
+  block:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+    - name: Install Docker dependencies
+      package:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Download Docker install script
+      get_url:
+        url: https://get.docker.com
+        dest: /tmp/get-docker.sh
+        mode: "0755"
+
+    - name: Run Docker install script
+      command: /tmp/get-docker.sh
+      when: not ansible_check_mode
+
+    - name: Remove Docker install script
+      file:
+        path: /tmp/get-docker.sh
+        state: absent
+
+    - name: Ensure Docker service is running
+      service:
+        name: docker
+        state: started
+        enabled: yes
+      when: not ansible_check_mode
+
+- name: Ensure flock is installed
+  package:
+    name: util-linux
+    state: present
+
+- name: Create required directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0750"
+  loop:
+    - "{{ base_app_path }}"
+    - "{{ base_log_path }}"
+    - "{{ lock_file_path }}"
+
+- name: Add app_user to Docker group
+  user:
+    name: "{{ app_user }}"
+    groups: docker
+    append: yes
+
+- name: Verify FUSE availability
+  command: modprobe fuse
+  changed_when: false
+  # Needed to load kernel module as root

@@ -1,0 +1,31 @@
+---
+- name: Find all client directories
+  find:
+    paths: "{{ playbook_dir }}/../vars/production"
+    file_type: directory
+  register: client_dirs
+  delegate_to: localhost
+  run_once: true
+
+- name: Find project directories for each client
+  find:
+    paths: "{{ item.path }}"
+    file_type: directory
+  register: project_dirs
+  loop: "{{ client_dirs.files }}"
+  delegate_to: localhost
+  run_once: true
+
+- name: Flatten project directories list
+  set_fact:
+    all_projects: "{{ project_dirs.results | map(attribute='files') | flatten }}"
+  run_once: true
+
+- name: Process each project
+  include_tasks: tasks/process_project.yml
+  loop: "{{ all_projects }}"
+  vars:
+    client_name: "{{ item.path | dirname | basename }}"
+    project_name: "{{ item.path | basename }}"
+    project_vars: "{{ lookup('file', item.path + '/ansible.yml') | from_yaml }}"
+  when: inventory_hostname in groups[project_vars.server]
