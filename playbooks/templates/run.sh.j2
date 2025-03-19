@@ -1,9 +1,20 @@
 #!/bin/bash
 
-# Run docker-compose with project-specific name
-docker-compose \
-  --env-file "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/vars/.env" \
-  -f {{ base_app_path }}/{{ client_name }}/{{ project_name }}/docker-compose.yml \
-  -p "backup_{{ client_name }}_{{ project_name }}" \
-  run \
-  --exit-code-from rustic
+# Build and run with no cache
+docker compose \
+    --env-file "./vars/.env" \
+    -f ./docker-compose.yml \
+    -p "backup_{{ client_name }}_{{ project_name }}" \
+    build --no-cache
+
+# Run docker compose with project-specific name
+SFTP_HOST_PUBKEY="$(cat './vars/host_id_ed25519.pub')" \
+SFTP_USER_PRIVKEY="$(cat './vars/user_id_ed25519')" \
+docker compose \
+    --env-file "./vars/.env" \
+    -f ./docker-compose.yml \
+    -p "backup_{{ client_name }}_{{ project_name }}" \
+    up \
+    --build \
+    --remove-orphans \
+    --exit-code-from rustic

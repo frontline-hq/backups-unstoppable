@@ -10,7 +10,12 @@ services:
     cap_add:
       - SYS_ADMIN
     volumes:
-      - ./vars/test/rclone.conf.template:/tmp/rclone.conf.template
+      - ./vars/test/rclone.conf.template:/home/appuser/templates/rclone.conf.template:ro
+    tmpfs:
+      - /home/appuser/tmp:size=100M,exec,nosuid,mode=700
+    security_opt:
+      - no-new-privileges:true
+    privileged: false
     environment:
       SFTP_HOST: "${SFTP_HOST}"
       SFTP_PORT: "${SFTP_PORT}"

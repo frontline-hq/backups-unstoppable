@@ -22,39 +22,48 @@
     cache_valid_time: 3600
   notify: Start cron service
 
-- name: Ensure Docker and Docker Compose are installed
+- name: Ensure Docker and dependencies are installed
   block:
     - name: Update apt cache
       apt:
         update_cache: yes
         cache_valid_time: 3600
-      when: ansible_os_family == "Debian"
 
-    - name: Install Docker dependencies
-      package:
+    - name: Install initial dependencies
+      apt:
         name:
-          - apt-transport-https
           - ca-certificates
           - curl
-          - gnupg
-          - lsb-release
         state: present
-      when: ansible_os_family == "Debian"
 
-    - name: Download Docker install script
-      get_url:
-        url: https://get.docker.com
-        dest: /tmp/get-docker.sh
+    - name: Create keyrings directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
         mode: "0755"
 
-    - name: Run Docker install script
-      command: /tmp/get-docker.sh
-      when: not ansible_check_mode
+    - name: Download Docker's GPG key
+      get_url:
+        url: https://download.docker.com/linux/debian/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
 
-    - name: Remove Docker install script
-      file:
-        path: /tmp/get-docker.sh
-        state: absent
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
+        state: present
+        filename: docker
+        update_cache: yes
+
+    - name: Install Docker packages
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
 
     - name: Ensure Docker service is running
       service:
@@ -62,6 +71,8 @@
         state: started
         enabled: yes
       when: not ansible_check_mode
+
+  when: ansible_os_family == "Debian"
 
 - name: Ensure flock is installed
   package:

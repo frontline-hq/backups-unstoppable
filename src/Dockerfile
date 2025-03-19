@@ -1,5 +1,13 @@
 ARG ENV=production
+# Add build args for UID and GID
+ARG USER_ID
+ARG GROUP_ID
+
 FROM rclone/rclone:latest
+
+# Need to redefine args after FROM
+ARG USER_ID
+ARG GROUP_ID
 
 COPY --from=ghcr.io/rustic-rs/rustic:latest / /
 
@@ -23,22 +31,22 @@ RUN echo "user_allow_other" >> /etc/fuse.conf
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Add script to generate backup data for testing
-COPY genbackupdata.sh /tmp/genbackupdata.sh
-RUN chmod +x /tmp/genbackupdata.sh
+# Create a group and user with host UID/GID
+RUN addgroup -S -g "${GROUP_ID}" appgroup && \
+    adduser -S -u "${USER_ID}" -G appgroup appuser
 
-# Create a group and user
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+# Create required directories and set permissions
+RUN mkdir -p /home/appuser/templates /home/appuser/tmp /persisted && \
+    chown -R appuser:appgroup /home/appuser /persisted && \
+    chmod 700 /home/appuser/templates
 
-# Create persisted dir for persisted data
-RUN mkdir -p /persisted
-RUN chown appuser:appgroup /persisted
+# Copy files with correct ownership
+COPY --chown=appuser:appgroup genbackupdata.sh /home/appuser/tmp/genbackupdata.sh
+COPY --chown=appuser:appgroup rustic.template.toml /home/appuser/tmp/rustic.template.toml
+RUN chmod +x /home/appuser/tmp/genbackupdata.sh
 
 # Tell docker that all future commands should run as the appuser user
 USER appuser
-
-# Copy config.toml template to a temporary location
-COPY rustic.template.toml /tmp/rustic.template.toml
 
 # Entry point handles mounting the SFTP directory and environment variable substitution
 ENTRYPOINT ["/entrypoint.sh"]

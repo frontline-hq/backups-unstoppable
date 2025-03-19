@@ -15,6 +15,21 @@
     group: "{{ app_group }}"
     mode: "0750"
 
+- name: Get UID of app user
+  command: id -u {{ app_user }}
+  register: app_user_uid_output
+  changed_when: false
+
+- name: Get GID of app group
+  command: id -g {{ app_user }}
+  register: app_group_gid_output
+  changed_when: false
+
+- name: Set UID/GID facts
+  set_fact:
+    app_user_uid: "{{ app_user_uid_output.stdout }}"
+    app_group_gid: "{{ app_group_gid_output.stdout }}"
+
 - name: Copy script files
   copy:
     src: "{{ playbook_dir }}/../src/"
@@ -35,14 +50,28 @@
 
     - name: Generate backup data
       command:
-        cmd: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/src/genbackupdata.sh -c {{ backup_size }} -s {{ backup_seed }} {{ base_app_path }}/{{ client_name }}/{{ project_name }}/persisted/sftp/backup_data"
+        cmd: >-
+          {{ base_app_path }}/{{ client_name }}/{{ project_name }}/src/genbackupdata.sh
+          -c {{ backup_size }}
+          -s {{ backup_seed }}
+          -f 16384
+          -d 3
+          -m 4
+          {{ base_app_path }}/{{ client_name }}/{{ project_name }}/persisted/sftp/backup_data
       args:
         creates: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/persisted/sftp/backup_data"
       register: backup_result
+      async: 600 # 10 minutes timeout
+      poll: 10 # Check every 10 seconds
+      when: project_vars.create_sftp | bool
+      environment:
+        PATH: "/usr/local/bin:/usr/bin:/bin" # Ensure openssl is available
 
     - name: Debug backup generation
       debug:
-        var: backup_result
+        msg:
+          - "Backup generation status: {{ backup_result.stdout if backup_result.stdout is defined else 'No output' }}"
+          - "Errors (if any): {{ backup_result.stderr if backup_result.stderr is defined else 'No errors' }}"
       when: backup_result is changed
   when: project_vars.create_sftp | bool
 
@@ -53,7 +82,6 @@
     owner: "{{ app_user }}"
     group: "{{ app_group }}"
     mode: "0640"
-  # Needed to set file ownership and permissions as root
   become: true
   become_user: "{{ app_user }}"
 
@@ -64,7 +92,6 @@
     owner: "{{ app_user }}"
     group: "{{ app_group }}"
     mode: "0750"
-  # Needed to set file ownership and execution permissions as root
   become: true
   become_user: "{{ app_user }}"
 
@@ -75,17 +102,8 @@
     owner: "{{ app_user }}"
     group: "{{ app_group }}"
     mode: "0640"
-  # Needed to set file ownership and permissions as root
   become: true
   become_user: "{{ app_user }}"
-
-- name: Set restrictive permissions on application root
-  file:
-    path: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}"
-    mode: "0750"
-    recurse: yes
-  # Needed to recursively set permissions as root
-  become: true
 
 - name: Test backup system
   block:
@@ -116,13 +134,12 @@
       cron:
         name: "Run {{ client_name }} - {{ project_name }}"
         user: "{{ app_user }}"
-        job: "flock -n {{ lock_file_path }}/{{ client_name }}_{{ project_name }}.lock {{ base_app_path }}/{{ client_name }}/{{ project_name }}/run.sh >> {{ base_log_path }}/{{ client_name }}/{{ project_name }}/app.log 2>&1"
+        job: "cd {{ base_app_path }}/{{ client_name }}/{{ project_name }} && flock -n {{ lock_file_path }}/{{ client_name }}_{{ project_name }}.lock ./run.sh >> {{ base_log_path }}/{{ client_name }}/{{ project_name }}/app.log 2>&1"
         minute: "{{ project_vars.schedule.split(' ')[0] }}"
         hour: "{{ project_vars.schedule.split(' ')[1] }}"
         day: "{{ project_vars.schedule.split(' ')[2] }}"
         month: "{{ project_vars.schedule.split(' ')[3] }}"
         weekday: "{{ project_vars.schedule.split(' ')[4] }}"
-      # Needed to install cron job as root
       become: true
       when: not ansible_check_mode
 

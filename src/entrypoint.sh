@@ -23,7 +23,7 @@ usage() {
     echo "  ORIGIN_PATH                Path on origin to mount (optional, defaults to /)" >&2
     echo >&2
     echo "Ensure that a rclone.conf.template file is mounted to the docker container at:" >&2
-    echo "  ${HOME}/rclone.conf.template" >&2
+    echo "  ${HOME}/templates/rclone.conf.template" >&2
     echo >&2
     echo "The following SFTP environment variables are optional and should only be set" >&2
     echo "if SFTP is the desired origin to be mounted:" >&2
@@ -84,7 +84,7 @@ fi
 
 # Define the path to the rclone.conf file and template
 RCLONE_CONF="${HOME}/.config/rclone/rclone.conf"
-RCLONE_TEMPLATE="/tmp/rclone.conf.template"
+RCLONE_TEMPLATE="${HOME}/templates/rclone.conf.template"
 
 # Create rclone config directory
 mkdir -p "${HOME}/.config/rclone"
@@ -110,7 +110,7 @@ fi
 mkdir -p "${HOME}/.config/rustic"
 
 # Perform environment variable substitution in config.toml
-envsubst < /tmp/rustic.template.toml > "${HOME}/.config/rustic/rustic.toml"
+envsubst < "${HOME}/tmp/rustic.template.toml" > "${HOME}/.config/rustic/rustic.toml"
 
 # Create the local mount point if it doesn't exist
 mkdir -p "$RCLONE_MOUNT_PATH"
