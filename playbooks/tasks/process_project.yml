@@ -38,6 +38,10 @@
     group: "{{ app_group }}"
     mode: preserve
 
+- name: Set timestamp fact
+  set_fact:
+    ansible_run_timestamp: "{{ ansible_date_time.epoch }}"
+
 - name: Generate backup data for SFTP
   block:
     - name: Create SFTP data directory
@@ -53,7 +57,7 @@
         cmd: >-
           {{ base_app_path }}/{{ client_name }}/{{ project_name }}/src/genbackupdata.sh
           -c {{ backup_size }}
-          -s {{ backup_seed }}
+          -s {{ ansible_run_timestamp }}
           -f 16384
           -d 3
           -m 4
@@ -105,6 +109,14 @@
   become: true
   become_user: "{{ app_user }}"
 
+- name: Create rustic container persisted directory
+  file:
+    path: "{{ base_app_path }}/{{ client_name }}/{{ project_name }}/persisted/rustic"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0750"
+
 - name: Test backup system
   block:
     - name: Run initial backup test
@@ -117,6 +129,8 @@
       changed_when: true
       environment:
         HOME: "/home/{{ app_user }}"
+        ANSIBLE_RUN_TIMESTAMP: "{{ ansible_run_timestamp }}"
+        COMMAND: '/bin/sh -c "/rustic backup --init --tag \"${ANSIBLE_RUN_TIMESTAMP}\" \"${HOME}/rclone/mount/${SFTP_PATH}\" && /rustic restore \"latest:${HOME}/rclone/mount/${SFTP_PATH}\" /tmp/test-data-restored && diffoscope --exclude-directory-metadata yes /tmp/test-data-restored \"$HOME/rclone/mount/${SFTP_PATH}\""'
       async: 1800
       poll: 10
 

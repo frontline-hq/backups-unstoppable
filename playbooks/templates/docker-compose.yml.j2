@@ -6,8 +6,8 @@ services:
     restart: always
     volumes:
       - ./vars/host_id_ed25519:/etc/ssh/ssh_host_ed25519_key:ro,Z
-      - ./vars/user_id_ed25519.pub:/home/sftpuser/.ssh/keys/id_ed25519.pub:ro,Z
-      - ./persisted/sftp/backupdata:/home/sftpuser/backupdata:ro,Z
+      - ./vars/user_id_ed25519.pub:/home/${SFTP_USER}/.ssh/keys/id_ed25519.pub:ro,Z
+      - ./persisted/sftp/backup_data:/home/${SFTP_USER}/backupdata:ro,Z
     command: "${SFTP_USER}::1001"
     logging:
       driver: "json-file"
@@ -38,7 +38,7 @@ services:
       - SYS_ADMIN
     volumes:
       - ./vars/rclone.conf.template:/home/appuser/templates/rclone.conf.template:ro,Z
-      - ./persisted/rustic:/persisted:Z
+      - ./persisted/rustic:/persisted/rustic:Z
     logging:
       driver: "json-file"
       options:

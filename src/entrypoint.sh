@@ -157,6 +157,12 @@ rclone mount \
 
 echo "Remote directory mounted successfully at $RCLONE_MOUNT_PATH"
 
+# Wait a moment for the mount to be fully ready
+sleep 2
+
+echo "Mounted directory structure:"
+find "$RCLONE_MOUNT_PATH" -print | sed -e "s;$RCLONE_MOUNT_PATH;.;g" -e 's/[^/]*\//|   /g' -e 's/|   \([^|]\)/+--- \1/'
+
 # Execute the command passed as arguments
 if [ $# -eq 0 ]; then
     echo "No command provided. Please provide a command to execute."
