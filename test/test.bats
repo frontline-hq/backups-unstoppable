@@ -2,7 +2,7 @@ export PROJECT_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
 source "${PROJECT_ROOT}/src/scripts/common.sh"
 
 setup_file() {
-    setup_environment
+    setup_environment --detach
 }
 
 teardown_file() {

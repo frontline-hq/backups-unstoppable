@@ -6,25 +6,32 @@ export SFTP_USER_PRIVKEY=$(cat "${PROJECT_ROOT}/vars/test/user_id_ed25519")
 
 # Common functions
 setup_environment() {
-    docker build -t rustic-image:latest --build-arg ENV="test" "${PROJECT_ROOT}/src"
-    
-    local services=()
-    for service in "$@"; do
-        services+=("$service")
+    local detach=false
+
+    # Parse arguments
+    while [[ "$#" -gt 0 ]]; do
+        case $1 in
+            --detach)
+                detach=true
+                ;;
+        esac
+        shift
     done
-    
-    if [ ${#services[@]} -eq 0 ]; then
-        # If no services are specified, start all services
-        docker-compose --env-file "${PROJECT_ROOT}/vars/test/.env" -f "${PROJECT_ROOT}/test/docker-compose.yaml" up \
-            --detach \
-            --remove-orphans
-    else
-        # Start only the specified services
-        docker-compose --env-file "${PROJECT_ROOT}/vars/test/.env" -f "${PROJECT_ROOT}/test/docker-compose.yaml" up \
-            --detach \
-            --remove-orphans \
-            "${services[@]}"
+
+    docker build -t rustic-image:latest \
+        --build-arg ENV="test" \
+        --build-arg USER_ID=$(id -u) \
+        --build-arg GROUP_ID=$(id -g) "${PROJECT_ROOT}/src"
+    local docker_compose_base_cmd="docker-compose --env-file \"${PROJECT_ROOT}/vars/test/.env\" -f \"${PROJECT_ROOT}/test/docker-compose.yaml\""
+    local docker_compose_up_cmd="${docker_compose_base_cmd} up --remove-orphans"
+
+    # Add --detach flag if specified
+    if $detach; then
+        docker_compose_up_cmd="$docker_compose_up_cmd --detach --wait"
     fi
+
+    # Start all services
+    eval $docker_compose_up_cmd
 }
 
 teardown_environment() {
@@ -60,25 +67,25 @@ setup_minio() {
 
     source "${PROJECT_ROOT}/vars/test/.env"
     source "$dir/.env"
-    
+
     echo "Debug: REMOTE_ENDPOINT: $REMOTE_ENDPOINT"
     echo "Debug: REMOTE_BUCKET_NAME: $REMOTE_BUCKET_NAME"
     echo "Debug: REMOTE_ACCESS_KEY_ID: $REMOTE_ACCESS_KEY_ID"
     echo "Debug: REMOTE_PATH: $REMOTE_PATH"
-    
+
     local docker_cmd="docker run --rm --network test-net-external"
-    
+
     if $interactive; then
         docker_cmd+=" -it"
         echo "Debug: Running in interactive mode"
     else
         echo "Debug: Running in non-interactive mode"
     fi
-    
+
     docker_cmd+=" --entrypoint=/bin/sh minio/mc -c"
-    
+
     local minio_cmds="mc alias set myminio ${REMOTE_ENDPOINT} ${REMOTE_ADMIN_ACCESS_KEY_ID:-${REMOTE_ACCESS_KEY_ID}} ${REMOTE_ADMIN_SECRET_ACCESS_KEY:-${REMOTE_SECRET_ACCESS_KEY}}"
-    
+
     if [[ -n "$create_new_bucket" && "$REMOTE_ENDPOINT" == ${create_new_bucket}* ]]; then
         echo "Debug: REMOTE_ENDPOINT matches condition. Creating new bucket and setting up user."
         minio_cmds+=" && \
@@ -93,14 +100,14 @@ setup_minio() {
         echo "Debug: Clearing bucket path: ${REMOTE_PATH}"
         minio_cmds+=" && mc rm -r --force myminio/${REMOTE_BUCKET_NAME}${REMOTE_PATH}"
     fi
-    
+
     if $interactive; then
         minio_cmds+=" && /bin/sh"
     fi
-    
+
     echo "Debug: Docker command: $docker_cmd"
     echo "Debug: MinIO commands: $minio_cmds"
-    
+
     echo "Debug: Executing Docker command..."
     $docker_cmd "$minio_cmds"
     echo "Debug: Docker command execution completed"
@@ -112,5 +119,6 @@ run_test() {
     docker-compose --env-file "${PROJECT_ROOT}/vars/test/.env" --env-file "$test_dir/.env" up \
         --abort-on-container-exit \
         --renew-anon-volumes \
-        --remove-orphans
+        --remove-orphans \
+        --force-recreate
 }

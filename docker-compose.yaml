@@ -5,17 +5,19 @@ services:
       context: ./src
       args:
         ENV: "${ENV}"
+        USER_ID: "$(id -u)"
+        GROUP_ID: "$(id -g)"
+    security_opt:
+      - apparmor:unconfined # Add this to ensure FUSE works
+    privileged: false
     devices:
       - "/dev/fuse:/dev/fuse"
+    cap_drop:
+      - ALL
     cap_add:
       - SYS_ADMIN
     volumes:
-      - ./vars/test/rclone.conf.template:/home/appuser/templates/rclone.conf.template:ro
-    tmpfs:
-      - /home/appuser/tmp:size=100M,exec,nosuid,mode=700
-    security_opt:
-      - no-new-privileges:true
-    privileged: false
+      - ./vars/test/rclone.conf.template:/home/appuser/templates/rclone.conf.template:ro,Z
     environment:
       SFTP_HOST: "${SFTP_HOST}"
       SFTP_PORT: "${SFTP_PORT}"
@@ -31,6 +33,7 @@ services:
       REMOTE_STORAGE_CLASS: "${REMOTE_STORAGE_CLASS}"
       RUSTIC_ENCRYPTION_PASSWORD: "${RUSTIC_ENCRYPTION_PASSWORD}"
       VFS_CACHE_MAX_SIZE: "${VFS_CACHE_MAX_SIZE}"
+      ORIGIN_PATH: "${ORIGIN_PATH}"
     networks:
       - test-net
     command: "${COMMAND}"

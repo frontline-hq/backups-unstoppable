@@ -34,6 +34,59 @@ It seems that setting up the cron job in the container is a setup that's easier 
 3. Install `bats`, the shell testing programm
 4. Run tests: `./test/bats/bin/bats test/test.bats`
 
+## Development
+
+### Manual Mode (manual_mode.sh)
+
+For development and testing purposes, you can use the `manual-mode.sh` script to interact directly with the backup system.
+
+```bash
+./src/scripts/manual-mode.sh /path/to/your/config/directory
+```
+
+This script:
+
+1. Sets up a complete Docker environment with all necessary containers (minio, sftp, rustic)
+2. Configures MinIO with your specified bucket
+3. Provides direct shell access to the rustic container
+4. Automatically cleans up all resources when you exit
+
+#### How to Use Manual Mode
+
+1. Run the script with the path to a configuration directory
+2. Access the rustic container shell to manually test operations
+3. Use the shell to explore and test the backup system
+4. Type `exit` when finished to clean up all containers
+
+This setup is particularly useful for:
+- Testing configurations from the vars/test folder
+- Debugging issues in a controlled environment
+- Experimenting with different rustic commands
+- Verifying backup and restore functionality
+
+### setup_environment_manual.sh
+
+`setup_environment_manual.sh` will only setup the services sftp and minio that are used by `manual_mode.sh`.
+This is useful to debug the creation of these services, however it is not required to be run additionally to `manual_mode.sh`.
+
+Usage:
+
+```bash
+./src/scripts/setup_environment_manual.sh
+```
+
+### Run tests
+
+Tests are run with bats.
+
+Usage:
+
+```bash
+./test/bats/bin/bats test/test.bats
+```
+
+This will run tests on all setups within `vars/test/`.
+
 ## Threat scenarios
 
 **Scenario A** ✅
